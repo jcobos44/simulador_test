@@ -1,0 +1,1632 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador 3D de metrología dimensional</title>
+<script>
+/* ================= CONFIGURACIÓN DEL PROFESOR =================
+   REGISTRO_URL: URL de tu aplicación web de Google Apps Script (termina en /exec).
+                 Si se deja vacía, el simulador funciona pero no envía respuestas a la hoja.
+   GRUPOS:       opcional. Ejemplo: ['3A', '3B'] muestra una lista en lugar de texto libre.
+   ACTIVIDAD:    nombre que aparece en el registro. Si lo cambias, los alumnos reciben medidas nuevas.
+   MOSTRAR_LECTURA_AL_EXPLORAR: false oculta siempre la lectura fuera de los ejercicios (recomendado para evaluar).
+                 Con true, al mover el instrumento sin ejercicio se muestra la lectura y su desglose (modo de estudio).
+   ============================================================== */
+window.MS_CONFIG = {
+  REGISTRO_URL: '',
+  GRUPOS: [],
+  ACTIVIDAD: 'Práctica de metrología',
+  MOSTRAR_LECTURA_AL_EXPLORAR: false
+};
+</script>
+<style>
+:root{--ms-c-fg:#1b1b19;--ms-c-fg-muted:#62615b;--ms-c-bg:#f6f5f1;--ms-c-panel:#ffffff;--ms-c-border-line:#dcdad1;--ms-c-ok:#1c7442;--ms-c-warn:#8f5400;--ms-c-bad:#b3261e;
+--ms-sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--ms-serif:Georgia,"Times New Roman",serif;
+--ms-radius:9px;--ms-pad-xs:5px;--ms-pad-sm:9px;--ms-pad-md:12px;--ms-pad-lg:16px;--ms-pad-xl:22px;--ms-gap-xs:5px;--ms-gap-sm:9px;--ms-gap-md:16px;--ms-gap-lg:22px;
+--ms-font-size-caption:.82rem;--ms-font-size-body:.95rem;--ms-font-size-heading:1.05rem;--ms-font-size-title:1.7rem;--ms-font-weight-medium:600}
+@media (prefers-color-scheme:dark){:root{--ms-c-fg:#efede6;--ms-c-fg-muted:#a5a298;--ms-c-bg:#1c1b19;--ms-c-panel:#272624;--ms-c-border-line:#45433e;--ms-c-ok:#62c78d;--ms-c-warn:#e3a84f;--ms-c-bad:#f27d72}}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ms-c-bg);color:var(--ms-c-fg)}
+.ms-page{padding:clamp(12px,3vw,28px)}
+
+.ms-wrap{font-family:var(--ms-sans);color:var(--ms-c-fg);display:flex;flex-direction:column;gap:var(--ms-gap-md);font-size:var(--ms-font-size-body);max-width:1320px;margin-inline:auto}
+.ms-wrap [hidden]{display:none !important}
+.ms-title{font-family:var(--ms-serif);font-weight:400;font-size:var(--ms-font-size-title);margin:0;line-height:1.2}
+.ms-sub{margin:var(--ms-gap-xs) 0 0;color:var(--ms-c-fg-muted)}
+.ms-bar{display:flex;flex-wrap:wrap;gap:var(--ms-gap-sm);align-items:center}
+.ms-seg{display:flex;flex-wrap:wrap;gap:var(--ms-gap-xs)}
+.ms-btn{font:inherit;font-size:var(--ms-font-size-caption);color:var(--ms-c-fg);background:var(--ms-c-panel);border:1px solid var(--ms-c-border-line);border-radius:var(--ms-radius);padding:var(--ms-pad-xs) var(--ms-pad-sm);cursor:pointer;line-height:1.35;touch-action:manipulation}
+.ms-btn:hover{border-color:var(--ms-c-fg-muted)}
+.ms-btn[aria-pressed="true"],.ms-btn.ms-on{background:var(--ms-c-fg);color:var(--ms-c-bg);border-color:var(--ms-c-fg)}
+.ms-btn:disabled{opacity:.45;cursor:not-allowed}
+.ms-btn.ms-primary{background:var(--ms-c-fg);color:var(--ms-c-bg);border-color:var(--ms-c-fg);font-weight:var(--ms-font-weight-medium)}
+.ms-label{font-size:var(--ms-font-size-caption);color:var(--ms-c-fg-muted)}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--ms-gap-md);align-items:start}
+.ms-grid.ms-wide{grid-template-columns:minmax(0,1.5fr) minmax(20rem,1fr)}
+.ms-col{display:flex;flex-direction:column;gap:var(--ms-gap-md);min-width:0}
+.ms-card{background:var(--ms-c-panel);border:1px solid var(--ms-c-border-line);border-radius:var(--ms-radius);padding:var(--ms-pad-lg);min-width:0}
+.ms-h{font-size:var(--ms-font-size-heading);font-weight:var(--ms-font-weight-medium);margin:0}
+.ms-note{font-size:var(--ms-font-size-caption);color:var(--ms-c-fg-muted);margin:var(--ms-gap-xs) 0 0}
+.ms-row{display:flex;flex-wrap:wrap;gap:var(--ms-gap-sm);align-items:center;justify-content:space-between}
+.ms-stage{position:relative;margin-top:var(--ms-gap-sm);border-radius:var(--ms-radius);overflow:hidden;background:radial-gradient(120% 120% at 30% 20%,#34404e 0%,#1d242d 55%,#12171d 100%);aspect-ratio:16/9;min-height:230px;max-height:380px;width:100%}
+.ms-gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab;outline-offset:-2px}
+.ms-chip{position:absolute;left:10px;bottom:10px;font-size:var(--ms-font-size-caption);padding:3px 9px;border-radius:999px;background:rgba(10,14,18,.72);color:#e8ecf0;pointer-events:none}
+.ms-chip.ms-ok{background:#1f7a46;color:#fff}
+.ms-views{position:absolute;right:8px;top:8px;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:calc(100% - 16px)}
+.ms-vbtn{font:inherit;font-size:var(--ms-font-size-caption);color:#e8ecf0;background:rgba(10,14,18,.62);border:1px solid rgba(255,255,255,.22);border-radius:var(--ms-radius);padding:3px 8px;cursor:pointer;line-height:1.3;touch-action:manipulation}
+.ms-vbtn:hover{background:rgba(10,14,18,.9)}
+.ms-vbtn.ms-on{background:#e8ecf0;color:#12171d}
+.ms-nogl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:var(--ms-pad-lg);text-align:center;color:#e8ecf0;font-size:var(--ms-font-size-caption)}
+.ms-move{display:flex;flex-wrap:wrap;gap:var(--ms-gap-xs);align-items:center;margin-top:var(--ms-gap-sm)}
+.ms-range{flex:1 1 9rem;min-width:7rem;accent-color:var(--ms-c-fg)}
+.ms-lenswrap{margin-top:var(--ms-gap-sm);border-radius:var(--ms-radius);overflow:hidden;background:#1b222b;line-height:0}
+.ms-lens{display:block;width:100%;height:180px;touch-action:pan-y;cursor:ew-resize}
+.ms-check{display:inline-flex;gap:6px;align-items:center;font-size:var(--ms-font-size-caption);cursor:pointer}
+.ms-big{font-family:var(--ms-serif);font-weight:400;font-size:2.4rem;line-height:1.1;margin:var(--ms-gap-sm) 0;font-variant-numeric:tabular-nums}
+.ms-steps{list-style:none;margin:var(--ms-gap-sm) 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ms-steps li{display:flex;gap:var(--ms-gap-sm);justify-content:space-between;align-items:baseline;border-top:1px solid var(--ms-c-border-line);padding-top:6px;font-size:var(--ms-font-size-caption)}
+.ms-steps .ms-sv{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:var(--ms-font-weight-medium);text-align:right}
+.ms-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.ms-st{margin:var(--ms-gap-sm) 0;line-height:1.45}
+.ms-ans{display:flex;flex-wrap:wrap;gap:var(--ms-gap-xs);align-items:center;margin-top:var(--ms-gap-sm)}
+.ms-input{font:inherit;color:var(--ms-c-fg);background:var(--ms-c-bg);border:1px solid var(--ms-c-border-line);border-radius:var(--ms-radius);padding:var(--ms-pad-xs) var(--ms-pad-sm);width:9.5rem;max-width:100%;font-variant-numeric:tabular-nums}
+.ms-fb{margin-top:var(--ms-gap-sm);padding:var(--ms-pad-sm);border-radius:var(--ms-radius);border:1px solid var(--ms-c-border-line);font-size:var(--ms-font-size-caption);line-height:1.45}
+.ms-fb.ms-good{border-color:var(--ms-c-ok)}.ms-fb.ms-good b{color:var(--ms-c-ok)}
+.ms-fb.ms-bad{border-color:var(--ms-c-bad)}.ms-fb.ms-bad b{color:var(--ms-c-bad)}
+.ms-fb.ms-warn{border-color:var(--ms-c-warn)}.ms-fb.ms-warn b{color:var(--ms-c-warn)}
+.ms-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(5.4rem,1fr));gap:var(--ms-gap-sm);margin-top:var(--ms-gap-sm)}
+.ms-tile{border:1px solid var(--ms-c-border-line);border-radius:var(--ms-radius);padding:var(--ms-pad-sm)}
+.ms-tile .ms-n{font-family:var(--ms-serif);font-size:1.5rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.ms-list{display:flex;flex-direction:column;gap:4px;margin-top:var(--ms-gap-sm);max-height:22rem;overflow:auto;min-height:6rem}
+.ms-ex{font:inherit;text-align:left;display:flex;gap:var(--ms-gap-sm);align-items:center;width:100%;background:transparent;color:var(--ms-c-fg);border:1px solid var(--ms-c-border-line);border-radius:var(--ms-radius);padding:var(--ms-pad-xs) var(--ms-pad-sm);cursor:pointer}
+.ms-ex:hover{border-color:var(--ms-c-fg-muted)}
+.ms-ex.ms-cur{border-color:var(--ms-c-fg);box-shadow:inset 3px 0 0 var(--ms-c-fg)}
+.ms-ex .ms-mark{flex:none;width:1.35rem;height:1.35rem;border-radius:50%;border:1px solid var(--ms-c-border-line);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--ms-c-fg-muted)}
+.ms-ex.ms-solved .ms-mark{border-color:var(--ms-c-ok);color:var(--ms-c-ok)}
+.ms-ex.ms-seen .ms-mark{border-color:var(--ms-c-warn);color:var(--ms-c-warn)}
+.ms-ex .ms-et{display:flex;flex-direction:column;min-width:0}
+.ms-ex .ms-e1{font-size:var(--ms-font-size-caption);font-weight:var(--ms-font-weight-medium)}
+.ms-ex .ms-e2{font-size:var(--ms-font-size-caption);color:var(--ms-c-fg-muted)}
+.ms-list[data-dash-source-state=refreshing]{opacity:.5}
+.ms-mt{margin-top:var(--ms-gap-sm)}
+
+.ms-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:var(--ms-gap-sm);align-items:end;margin-top:var(--ms-gap-sm)}
+.ms-field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ms-field .ms-input{width:100%;box-sizing:border-box}
+.ms-regdone{display:flex;flex-wrap:wrap;gap:var(--ms-gap-sm);align-items:center;justify-content:space-between}
+.ms-who{font-weight:var(--ms-font-weight-medium)}
+.ms-regerr{color:var(--ms-c-bad)}
+.ms-sync{font-size:var(--ms-font-size-caption);padding:2px 9px;border-radius:999px;border:1px solid var(--ms-c-border-line);white-space:nowrap}
+.ms-sync.ms-sok{color:var(--ms-c-ok);border-color:var(--ms-c-ok)}
+.ms-sync.ms-swarn{color:var(--ms-c-warn);border-color:var(--ms-c-warn)}
+.ms-sync.ms-sbad{color:var(--ms-c-bad);border-color:var(--ms-c-bad)}
+.ms-foot{font-size:var(--ms-font-size-caption);color:var(--ms-c-fg-muted);margin:0}
+.ms-actcard{border:2px solid var(--ms-c-fg)}
+.ms-list.ms-locked .ms-ex{opacity:.55}
+.ms-startbtn{margin-top:var(--ms-gap-xs)}
+.ms-views{position:static;max-width:none;justify-content:flex-start;margin-top:var(--ms-gap-sm)}
+.ms-vbtn{color:var(--ms-c-fg);background:var(--ms-c-panel);border:1px solid var(--ms-c-border-line);padding:var(--ms-pad-xs) var(--ms-pad-sm)}
+.ms-vbtn:hover{background:var(--ms-c-panel);border-color:var(--ms-c-fg-muted)}
+.ms-vbtn.ms-on{background:var(--ms-c-fg);color:var(--ms-c-bg);border-color:var(--ms-c-fg)}
+</style>
+</head>
+<body>
+
+
+<div class="ms-page"><div class="ms-wrap">
+  <header>
+    <h1 class="ms-title" id="simulador">Simulador 3D de metrología dimensional</h1>
+    <p class="ms-sub">Selecciona el instrumento y la escala, elige un ejercicio, lee la medida en la lupa y escribe tu lectura.</p>
+  </header>
+
+  <section class="ms-card" id="alumno">
+    <div class="ms-row">
+      <h2 class="ms-h">Registro del alumno</h2>
+      <span class="ms-sync"></span>
+    </div>
+    <div class="ms-regform">
+      <p class="ms-note">Escribe tus datos para iniciar los ejercicios. Tus respuestas, correctas e incorrectas, quedan registradas para tu profesor.</p>
+      <div class="ms-fields">
+        <label class="ms-field"><span class="ms-label">Nombre completo</span><input class="ms-input ms-fnombre" type="text" autocomplete="name" maxlength="80"></label>
+        <label class="ms-field"><span class="ms-label">Matrícula</span><input class="ms-input ms-fmat" type="text" autocomplete="off" spellcheck="false" maxlength="20"></label>
+        <label class="ms-field"><span class="ms-label">Grupo</span><input class="ms-input ms-fgrupo" type="text" autocomplete="off" spellcheck="false" maxlength="20"></label>
+        <button type="button" class="ms-btn ms-primary ms-regbtn">Comenzar</button>
+      </div>
+      <p class="ms-note ms-regerr" hidden></p>
+    </div>
+    <div class="ms-regdone" hidden>
+      <span class="ms-who"></span>
+      <div class="ms-seg">
+        <button type="button" class="ms-btn ms-csvbtn">Descargar mi registro</button>
+        <button type="button" class="ms-btn ms-changebtn">Cambiar alumno</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="ms-bar" id="instrumentos">
+    <span class="ms-label">1. Instrumento</span>
+    <div class="ms-seg ms-models"></div>
+    <span class="ms-label ms-unitlabel">Escala a leer</span>
+    <div class="ms-seg ms-units"></div>
+  </div>
+
+  <div class="ms-grid">
+    <div class="ms-col">
+      <section class="ms-card" id="modelo-3d">
+        <div class="ms-row">
+          <h2 class="ms-h ms-modelname">Instrumento</h2>
+          <span class="ms-label">Arrastra la parte móvil para medir · arrastra el fondo para girar</span>
+        </div>
+        <div class="ms-views">
+          <button type="button" class="ms-vbtn" data-view="todo">Ver todo</button>
+          <button type="button" class="ms-vbtn" data-view="escala">Acercar escala</button>
+          <button type="button" class="ms-vbtn" data-view="frente">Frente</button>
+          <button type="button" class="ms-vbtn" data-view="3d">3D</button>
+          <button type="button" class="ms-vbtn" data-view="menos" aria-label="Alejar">−</button>
+          <button type="button" class="ms-vbtn" data-view="mas" aria-label="Acercar">+</button>
+        </div>
+        <div class="ms-stage">
+          <canvas class="ms-gl" tabindex="0" aria-label="Modelo 3D del instrumento"></canvas>
+          <div class="ms-nogl" hidden>Este navegador no pudo iniciar la vista 3D. Puedes seguir practicando con la lupa de lectura y los controles de movimiento.</div>
+          <div class="ms-chip" hidden></div>
+        </div>
+        <div class="ms-move">
+          <button type="button" class="ms-btn" data-step="-c"></button>
+          <button type="button" class="ms-btn" data-step="-f"></button>
+          <input class="ms-range" type="range" min="0" max="100" step="1" value="0" aria-label="Posición del instrumento">
+          <button type="button" class="ms-btn" data-step="+f"></button>
+          <button type="button" class="ms-btn" data-step="+c"></button>
+        </div>
+        <p class="ms-note ms-movenote"></p>
+      </section>
+
+      <section class="ms-card" id="lupa">
+        <div class="ms-row">
+          <h2 class="ms-h">Lupa de lectura</h2>
+          <div class="ms-seg">
+            <label class="ms-check"><input type="checkbox" class="ms-guides"> Mostrar guías (pista)</label>
+            <button type="button" class="ms-btn" data-lens="-" aria-label="Reducir lupa">−</button>
+            <button type="button" class="ms-btn" data-lens="+" aria-label="Ampliar lupa">+</button>
+          </div>
+        </div>
+        <div class="ms-lenswrap"><canvas class="ms-lens" aria-label="Vista ampliada de la escala"></canvas></div>
+        <p class="ms-note ms-lensnote"></p>
+      </section>
+    </div>
+
+    <aside class="ms-col">
+      <section class="ms-card ms-actcard" id="actividad">
+        <div class="ms-row">
+          <h2 class="ms-h ms-acttitle">Tu ejercicio</h2>
+          <button type="button" class="ms-btn ms-toggle">Ocultar lectura</button>
+        </div>
+        <p class="ms-note ms-actsub" hidden></p>
+        <p class="ms-st ms-stmt"></p>
+        <button type="button" class="ms-btn ms-primary ms-startbtn">Iniciar ejercicio pendiente</button>
+        <div class="ms-free">
+          <div class="ms-big ms-read">—</div>
+        </div>
+        <div class="ms-quiz" hidden>
+          <div class="ms-ans">
+            <input class="ms-input ms-answer" type="text" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Tu lectura">
+            <span class="ms-label ms-ansunit"></span>
+            <button type="button" class="ms-btn ms-primary ms-checkbtn">Comprobar</button>
+            <button type="button" class="ms-btn ms-solbtn">Ver solución</button>
+            <button type="button" class="ms-btn ms-nextbtn">Siguiente ejercicio</button>
+          </div>
+          <p class="ms-note ms-anshint"></p>
+          <div class="ms-fb" hidden></div>
+        </div>
+        <ul class="ms-steps"></ul>
+        <button type="button" class="ms-btn ms-leavebtn ms-mt" hidden>Salir del ejercicio</button>
+      </section>
+
+      <section class="ms-card" id="ejercicios">
+        <h2 class="ms-h">2. Ejercicios propuestos</h2>
+        <p class="ms-note ms-count">—</p>
+        <div class="ms-seg ms-filters ms-mt">
+          <button type="button" class="ms-btn" data-filter="sel">Del instrumento seleccionado</button>
+          <button type="button" class="ms-btn" data-filter="todos">Todos</button>
+        </div>
+        <div class="ms-list"></div>
+        <div class="ms-tiles">
+          <div class="ms-tile"><div class="ms-n ms-t1">—</div><div class="ms-label">Resueltos</div></div>
+          <div class="ms-tile"><div class="ms-n ms-t2">—</div><div class="ms-label">Al primer intento</div></div>
+          <div class="ms-tile"><div class="ms-n ms-t3">—</div><div class="ms-label">Respuestas correctas</div></div>
+          <div class="ms-tile"><div class="ms-n ms-t4">—</div><div class="ms-label">Respuestas incorrectas</div></div>
+        </div>
+      </section>
+
+      <section class="ms-card" id="practica-libre">
+        <h2 class="ms-h">Práctica adicional</h2>
+        <p class="ms-note">Genera medidas nuevas al azar con el instrumento y la escala seleccionados. También quedan registradas.</p>
+        <div class="ms-seg ms-mt">
+          <button type="button" class="ms-btn ms-rndread">Lectura al azar</button>
+          <button type="button" class="ms-btn ms-rndpiece">Pieza al azar</button>
+        </div>
+        <p class="ms-note ms-randstats"></p>
+      </section>
+    </aside>
+  </div>
+  <p class="ms-foot">Simulador de práctica. Las respuestas a los ejercicios se registran con el nombre, la matrícula y el grupo que escribiste.</p>
+</div></div>
+
+<script>window.MS_BANCO = [{"id": "V01", "inst": "vernier", "res": "0.05 mm", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 10, "max": 60, "rule": "cero", "text": "Lee la medida que marca el vernier. Observa que el 0 del vernier coincide con una marca de la regla."}, {"id": "V02", "inst": "vernier", "res": "0.05 mm", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 5, "max": 40, "rule": "libre", "text": "Lee la medida que marca el vernier en milímetros."}, {"id": "V03", "inst": "vernier", "res": "0.05 mm", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 20, "max": 80, "rule": "libre", "text": "Lee la medida que marca el vernier en milímetros."}, {"id": "V04", "inst": "vernier", "res": "0.05 mm", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 50, "max": 130, "rule": "libre", "text": "Lee la medida que marca el vernier en milímetros."}, {"id": "V05", "inst": "vernier", "res": "0.05 mm", "kind": "pieza", "nivel": "básico", "shape": "cilindro", "measure": "exterior", "min": 15, "max": 45, "rule": "libre", "text": "Mide el diámetro exterior del eje cilíndrico con las mordazas para exteriores."}, {"id": "V06", "inst": "vernier", "res": "0.05 mm", "kind": "pieza", "nivel": "intermedio", "shape": "bloque", "measure": "exterior", "min": 30, "max": 90, "rule": "libre", "text": "Mide el ancho del bloque con las mordazas para exteriores."}, {"id": "V07", "inst": "vernier", "res": "0.05 mm", "kind": "pieza", "nivel": "intermedio", "shape": "tubo", "measure": "interior", "min": 20, "max": 60, "rule": "libre", "text": "Mide el diámetro interior del buje con las puntas para interiores."}, {"id": "V08", "inst": "vernier", "res": "0.05 mm", "kind": "pieza", "nivel": "avanzado", "shape": "ranura", "measure": "profundidad", "min": 8, "max": 40, "rule": "libre", "text": "Mide la profundidad de la ranura con la varilla de profundidad."}, {"id": "V09", "inst": "vernier", "res": "0.02 mm", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 10, "max": 50, "rule": "libre", "text": "Lee la medida que marca el vernier de 0.02 mm."}, {"id": "V10", "inst": "vernier", "res": "0.02 mm", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 40, "max": 90, "rule": "libre", "text": "Lee la medida que marca el vernier de 0.02 mm."}, {"id": "V11", "inst": "vernier", "res": "0.02 mm", "kind": "lectura", "nivel": "avanzado", "shape": "", "measure": "exterior", "min": 95, "max": 140, "rule": "libre", "text": "Lee la medida que marca el vernier de 0.02 mm. Cuida la última cifra."}, {"id": "V12", "inst": "vernier", "res": "0.02 mm", "kind": "pieza", "nivel": "intermedio", "shape": "cilindro", "measure": "exterior", "min": 12, "max": 40, "rule": "libre", "text": "Mide el diámetro exterior del eje cilíndrico."}, {"id": "V13", "inst": "vernier", "res": "0.02 mm", "kind": "pieza", "nivel": "avanzado", "shape": "tubo", "measure": "interior", "min": 20, "max": 50, "rule": "libre", "text": "Mide el diámetro interior del buje con las puntas para interiores."}, {"id": "V14", "inst": "vernier", "res": "0.02 mm", "kind": "pieza", "nivel": "avanzado", "shape": "ranura", "measure": "profundidad", "min": 8, "max": 35, "rule": "libre", "text": "Mide la profundidad de la ranura con la varilla de profundidad."}, {"id": "V15", "inst": "vernier", "res": "1/128 in", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 0.5, "max": 3, "rule": "cero", "text": "Lee la medida en pulgadas fraccionarias. El 0 del vernier coincide con una marca de la regla."}, {"id": "V16", "inst": "vernier", "res": "1/128 in", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 0.25, "max": 1, "rule": "libre", "text": "Lee la medida en pulgadas fraccionarias y simplifica la fracción."}, {"id": "V17", "inst": "vernier", "res": "1/128 in", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 1.5, "max": 4, "rule": "libre", "text": "Lee la medida en pulgadas fraccionarias y simplifica la fracción."}, {"id": "V18", "inst": "vernier", "res": "1/128 in", "kind": "pieza", "nivel": "intermedio", "shape": "cilindro", "measure": "exterior", "min": 0.75, "max": 2, "rule": "libre", "text": "Mide el diámetro exterior del eje en pulgadas fraccionarias."}, {"id": "V19", "inst": "vernier", "res": "1/128 in", "kind": "pieza", "nivel": "avanzado", "shape": "bloque", "measure": "exterior", "min": 2, "max": 4, "rule": "libre", "text": "Mide el ancho del bloque en pulgadas fraccionarias."}, {"id": "V20", "inst": "vernier", "res": "0.001 in", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 1, "max": 2.5, "rule": "libre", "text": "Lee la medida en milésimas de pulgada."}, {"id": "V21", "inst": "vernier", "res": "0.001 in", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 0.2, "max": 0.95, "rule": "libre", "text": "Lee la medida en milésimas de pulgada."}, {"id": "V22", "inst": "vernier", "res": "0.001 in", "kind": "lectura", "nivel": "avanzado", "shape": "", "measure": "exterior", "min": 3, "max": 5, "rule": "libre", "text": "Lee la medida en milésimas de pulgada. Cuida las divisiones de 0.025."}, {"id": "V23", "inst": "vernier", "res": "0.001 in", "kind": "pieza", "nivel": "avanzado", "shape": "cilindro", "measure": "exterior", "min": 0.5, "max": 1.5, "rule": "libre", "text": "Mide el diámetro exterior del eje en milésimas de pulgada."}, {"id": "M01", "inst": "micrometro", "res": "0.01 mm", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 3, "max": 20, "rule": "cero", "text": "Lee la medida que marca el micrómetro. El tambor está en 0."}, {"id": "M02", "inst": "micrometro", "res": "0.01 mm", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 5, "max": 20, "rule": "sinmedio", "text": "Lee la medida que marca el micrómetro en milímetros."}, {"id": "M03", "inst": "micrometro", "res": "0.01 mm", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 2, "max": 15, "rule": "medio", "text": "Lee la medida que marca el micrómetro. Fíjate si aparece la marca de medio milímetro."}, {"id": "M04", "inst": "micrometro", "res": "0.01 mm", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 10, "max": 24, "rule": "libre", "text": "Lee la medida que marca el micrómetro en milímetros."}, {"id": "M05", "inst": "micrometro", "res": "0.01 mm", "kind": "lectura", "nivel": "avanzado", "shape": "", "measure": "exterior", "min": 5, "max": 20, "rule": "borde", "text": "Lee la medida que marca el micrómetro. Decide con cuidado cuál es la última marca descubierta del cilindro."}, {"id": "M06", "inst": "micrometro", "res": "0.01 mm", "kind": "pieza", "nivel": "básico", "shape": "esfera", "measure": "exterior", "min": 6, "max": 20, "rule": "libre", "text": "Mide el diámetro del balín."}, {"id": "M07", "inst": "micrometro", "res": "0.01 mm", "kind": "pieza", "nivel": "intermedio", "shape": "lamina", "measure": "exterior", "min": 0.4, "max": 2.5, "rule": "libre", "text": "Mide el espesor de la lámina."}, {"id": "M08", "inst": "micrometro", "res": "0.01 mm", "kind": "pieza", "nivel": "intermedio", "shape": "cilindro", "measure": "exterior", "min": 4, "max": 15, "rule": "libre", "text": "Mide el diámetro del perno cilíndrico."}, {"id": "M09", "inst": "micrometro", "res": "0.01 mm", "kind": "pieza", "nivel": "avanzado", "shape": "bloque", "measure": "exterior", "min": 15, "max": 24, "rule": "libre", "text": "Mide el espesor del bloque."}, {"id": "M10", "inst": "micrometro", "res": "0.001 in", "kind": "lectura", "nivel": "básico", "shape": "", "measure": "exterior", "min": 0.1, "max": 0.8, "rule": "cero", "text": "Lee la medida que marca el micrómetro en pulgadas. El tambor está en 0."}, {"id": "M11", "inst": "micrometro", "res": "0.001 in", "kind": "lectura", "nivel": "intermedio", "shape": "", "measure": "exterior", "min": 0.2, "max": 0.9, "rule": "libre", "text": "Lee la medida que marca el micrómetro en milésimas de pulgada."}, {"id": "M12", "inst": "micrometro", "res": "0.001 in", "kind": "lectura", "nivel": "avanzado", "shape": "", "measure": "exterior", "min": 0.2, "max": 0.9, "rule": "borde", "text": "Lee la medida que marca el micrómetro. Decide con cuidado cuál es la última marca descubierta del cilindro."}, {"id": "M13", "inst": "micrometro", "res": "0.001 in", "kind": "pieza", "nivel": "intermedio", "shape": "esfera", "measure": "exterior", "min": 0.25, "max": 0.8, "rule": "libre", "text": "Mide el diámetro del balín en milésimas de pulgada."}, {"id": "M14", "inst": "micrometro", "res": "0.001 in", "kind": "pieza", "nivel": "avanzado", "shape": "lamina", "measure": "exterior", "min": 0.015, "max": 0.1, "rule": "libre", "text": "Mide el espesor de la lámina en milésimas de pulgada."}];</script>
+<script>
+/* Motor 3D mínimo (WebGL) para el simulador de metrología. Expone window.MS3D. */
+(function () {
+  'use strict';
+
+  const m4 = {
+    ident() { return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]); },
+    mul(a, b) {
+      const o = new Float32Array(16);
+      for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+        let s = 0;
+        for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
+        o[c * 4 + r] = s;
+      }
+      return o;
+    },
+    translate(x, y, z) { const m = m4.ident(); m[12] = x; m[13] = y; m[14] = z; return m; },
+    rotX(a) { const c = Math.cos(a), s = Math.sin(a), m = m4.ident(); m[5] = c; m[6] = s; m[9] = -s; m[10] = c; return m; },
+    perspective(fovy, aspect, near, far) {
+      const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far), o = new Float32Array(16);
+      o[0] = f / aspect; o[5] = f; o[10] = (far + near) * nf; o[11] = -1; o[14] = 2 * far * near * nf;
+      return o;
+    },
+    lookAt(e, c, up) {
+      let zx = e[0] - c[0], zy = e[1] - c[1], zz = e[2] - c[2];
+      let l = Math.hypot(zx, zy, zz); zx /= l; zy /= l; zz /= l;
+      let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+      l = Math.hypot(xx, xy, xz); xx /= l; xy /= l; xz /= l;
+      const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+      return new Float32Array([xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0,
+        -(xx * e[0] + xy * e[1] + xz * e[2]), -(yx * e[0] + yy * e[1] + yz * e[2]), -(zx * e[0] + zy * e[1] + zz * e[2]), 1]);
+    },
+    invert(a) {
+      const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3], a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11], a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+      const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10, b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11, b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30, b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31, b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
+      let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+      if (!det) return null;
+      det = 1 / det;
+      const o = new Float32Array(16);
+      o[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det; o[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+      o[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det; o[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+      o[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det; o[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+      o[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det; o[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+      o[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det; o[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+      o[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det; o[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+      o[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det; o[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+      o[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det; o[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+      return o;
+    },
+    point(m, p) {
+      const x = p[0], y = p[1], z = p[2];
+      const w = m[3] * x + m[7] * y + m[11] * z + m[15] || 1;
+      return [(m[0] * x + m[4] * y + m[8] * z + m[12]) / w, (m[1] * x + m[5] * y + m[9] * z + m[13]) / w, (m[2] * x + m[6] * y + m[10] * z + m[14]) / w];
+    }
+  };
+
+  /* ---------- Constructor de mallas ---------- */
+  const AX = { // marcos para sólidos de revolución: eje A, C (ángulo 0), B (ángulo 90°)
+    x: { A: [1, 0, 0], C: [0, 0, 1], B: [0, 1, 0] },
+    y: { A: [0, 1, 0], C: [0, 0, 1], B: [1, 0, 0] },
+    z: { A: [0, 0, 1], C: [1, 0, 0], B: [0, 1, 0] }
+  };
+
+  function triangulate(pts) {
+    const V = pts.map((_, i) => i), idx = [];
+    const area = (a, b, c) => (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]);
+    let guard = 0;
+    while (V.length > 3 && guard++ < 2000) {
+      let cut = false;
+      for (let i = 0; i < V.length; i++) {
+        const a = V[(i + V.length - 1) % V.length], b = V[i], c = V[(i + 1) % V.length];
+        if (area(a, b, c) <= 1e-9) continue;
+        let ok = true;
+        for (const p of V) {
+          if (p === a || p === b || p === c) continue;
+          if (area(a, b, p) >= 0 && area(b, c, p) >= 0 && area(c, a, p) >= 0) { ok = false; break; }
+        }
+        if (ok) { idx.push(a, b, c); V.splice(i, 1); cut = true; break; }
+      }
+      if (!cut) break;
+    }
+    if (V.length === 3) idx.push(V[0], V[1], V[2]);
+    return idx;
+  }
+
+  function Builder() { this.d = []; this.i = []; this.n = 0; }
+  Builder.prototype.v = function (x, y, z, nx, ny, nz, u, v) { this.d.push(x, y, z, nx, ny, nz, u || 0, v || 0); return this.n++; };
+  Builder.prototype.quad = function (a, b, c, d) { this.i.push(a, b, c, a, c, d); };
+  Builder.prototype.face = function (p0, p1, p2, p3, n) {
+    const a = this.v(p0[0], p0[1], p0[2], n[0], n[1], n[2], 0, 1), b = this.v(p1[0], p1[1], p1[2], n[0], n[1], n[2], 1, 1),
+      c = this.v(p2[0], p2[1], p2[2], n[0], n[1], n[2], 1, 0), d = this.v(p3[0], p3[1], p3[2], n[0], n[1], n[2], 0, 0);
+    this.quad(a, b, c, d);
+    return this;
+  };
+  Builder.prototype.box = function (x0, y0, z0, x1, y1, z1) {
+    this.face([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]);
+    this.face([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1]);
+    this.face([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0]);
+    this.face([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0]);
+    this.face([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0]);
+    this.face([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0]);
+    return this;
+  };
+  /* cara frontal (plano XY) con coordenadas de textura: u a la derecha, v hacia abajo */
+  Builder.prototype.quadXY = function (x0, y0, x1, y1, z) {
+    return this.face([x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z], [0, 0, 1]);
+  };
+  Builder.prototype.extrude = function (pts, z0, z1) {
+    let A = 0;
+    for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; A += p[0] * q[1] - q[0] * p[1]; }
+    if (A < 0) pts = pts.slice().reverse();
+    const tri = triangulate(pts);
+    for (const [z, nz] of [[z1, 1], [z0, -1]]) {
+      const base = this.n;
+      for (const p of pts) this.v(p[0], p[1], z, 0, 0, nz);
+      for (let k = 0; k < tri.length; k += 3) this.i.push(base + tri[k], base + tri[k + 1], base + tri[k + 2]);
+    }
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1;
+      this.face([p[0], p[1], z0], [q[0], q[1], z0], [q[0], q[1], z1], [p[0], p[1], z1], [dy / l, -dx / l, 0]);
+    }
+    return this;
+  };
+  function fr(o, F, t, r, ang) {
+    const c = Math.cos(ang) * r, s = Math.sin(ang) * r;
+    return [o[0] + F.A[0] * t + F.C[0] * c + F.B[0] * s, o[1] + F.A[1] * t + F.C[1] * c + F.B[1] * s, o[2] + F.A[2] * t + F.C[2] * c + F.B[2] * s];
+  }
+  /* superficie de revolución. profile: [[t, r], ...]. uv(tf, af) opcional -> [u, v] */
+  Builder.prototype.lathe = function (o, axis, profile, seg, a0, a1, uv) {
+    const F = AX[axis];
+    if (a0 === undefined) { a0 = -Math.PI; a1 = Math.PI; }
+    for (let k = 0; k < profile.length - 1; k++) {
+      const [t0, r0] = profile[k], [t1, r1] = profile[k + 1];
+      const dt = t1 - t0, dr = r1 - r0, l = Math.hypot(dt, dr) || 1, nt = -dr / l, nr = dt / l;
+      const base = this.n;
+      for (let i = 0; i <= seg; i++) {
+        const af = i / seg, ang = a0 + (a1 - a0) * af, c = Math.cos(ang), s = Math.sin(ang);
+        const nx = F.A[0] * nt + (F.C[0] * c + F.B[0] * s) * nr, ny = F.A[1] * nt + (F.C[1] * c + F.B[1] * s) * nr, nz = F.A[2] * nt + (F.C[2] * c + F.B[2] * s) * nr;
+        const p = fr(o, F, t0, r0, ang), q = fr(o, F, t1, r1, ang);
+        const u0 = uv ? uv(0, af) : [0, 0], u1 = uv ? uv(1, af) : [0, 0];
+        this.v(p[0], p[1], p[2], nx, ny, nz, u0[0], u0[1]);
+        this.v(q[0], q[1], q[2], nx, ny, nz, u1[0], u1[1]);
+      }
+      for (let i = 0; i < seg; i++) { const a = base + i * 2; this.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+    }
+    return this;
+  };
+  Builder.prototype.disc = function (o, axis, t, ri, ro, seg, dir, a0, a1) {
+    const F = AX[axis];
+    if (a0 === undefined) { a0 = -Math.PI; a1 = Math.PI; }
+    const n = [F.A[0] * dir, F.A[1] * dir, F.A[2] * dir], base = this.n;
+    for (let i = 0; i <= seg; i++) {
+      const ang = a0 + (a1 - a0) * i / seg, p = fr(o, F, t, ri, ang), q = fr(o, F, t, ro, ang);
+      this.v(p[0], p[1], p[2], n[0], n[1], n[2]);
+      this.v(q[0], q[1], q[2], n[0], n[1], n[2]);
+    }
+    for (let i = 0; i < seg; i++) { const a = base + i * 2; this.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+    return this;
+  };
+  Builder.prototype.cylinder = function (o, axis, t0, t1, r, seg) {
+    return this.lathe(o, axis, [[t0, r], [t1, r]], seg).disc(o, axis, t0, 0, r, seg, -1).disc(o, axis, t1, 0, r, seg, 1);
+  };
+  Builder.prototype.sphere = function (c, r, seg) {
+    const rows = Math.max(8, seg >> 1), base = this.n;
+    for (let j = 0; j <= rows; j++) {
+      const th = Math.PI * j / rows, sy = Math.cos(th), sr = Math.sin(th);
+      for (let i = 0; i <= seg; i++) {
+        const ph = 2 * Math.PI * i / seg, nx = sr * Math.cos(ph), nz = sr * Math.sin(ph);
+        this.v(c[0] + r * nx, c[1] + r * sy, c[2] + r * nz, nx, sy, nz);
+      }
+    }
+    for (let j = 0; j < rows; j++) for (let i = 0; i < seg; i++) {
+      const a = base + j * (seg + 1) + i, b = a + seg + 1;
+      this.i.push(a, b, b + 1, a, b + 1, a + 1);
+    }
+    return this;
+  };
+
+  /* ---------- Render ---------- */
+  const VS = [
+    'attribute vec3 aP; attribute vec3 aN; attribute vec2 aT;',
+    'uniform mat4 uVP; uniform mat4 uM;',
+    'varying vec3 vN; varying vec2 vT; varying vec3 vW;',
+    'void main(){ vec4 w = uM * vec4(aP, 1.0); vW = w.xyz;',
+    '  vN = mat3(uM[0].xyz, uM[1].xyz, uM[2].xyz) * aN; vT = aT; gl_Position = uVP * w; }'
+  ].join('\n');
+  const FS = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH', 'precision highp float;', '#else', 'precision mediump float;', '#endif',
+    'varying vec3 vN; varying vec2 vT; varying vec3 vW;',
+    'uniform vec3 uColor; uniform float uUseTex; uniform sampler2D uTex;',
+    'uniform vec3 uL; uniform vec3 uL2; uniform vec3 uEye; uniform float uSpec;',
+    'void main(){',
+    '  vec3 n = normalize(vN); vec3 v = normalize(uEye - vW);',
+    '  if (dot(n, v) < 0.0) n = -n;',
+    '  vec3 base = mix(uColor, texture2D(uTex, vT).rgb, uUseTex);',
+    '  float d = max(dot(n, uL), 0.0); float d2 = max(dot(n, uL2), 0.0);',
+    '  float s = pow(max(dot(n, normalize(uL + v)), 0.0), 48.0) * uSpec;',
+    '  float hemi = 0.5 + 0.5 * n.y;',
+    '  vec3 col = base * (mix(0.28, 0.50, hemi) + 0.60 * d + 0.20 * d2) + vec3(s);',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n');
+
+  function create(canvas) {
+    const opts = { antialias: true, alpha: true, premultipliedAlpha: true, preserveDrawingBuffer: false };
+    let gl = null;
+    try { gl = canvas.getContext('webgl2', opts) || canvas.getContext('webgl', opts) || canvas.getContext('experimental-webgl', opts); } catch (e) { gl = null; }
+    if (!gl) return null;
+
+    function shader(type, src) {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader');
+      return s;
+    }
+    let prog;
+    try {
+      prog = gl.createProgram();
+      gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS));
+      gl.bindAttribLocation(prog, 0, 'aP'); gl.bindAttribLocation(prog, 1, 'aN'); gl.bindAttribLocation(prog, 2, 'aT');
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link');
+    } catch (e) { return null; }
+    gl.useProgram(prog);
+    const U = {};
+    for (const n of ['uVP', 'uM', 'uColor', 'uUseTex', 'uTex', 'uL', 'uL2', 'uEye', 'uSpec']) U[n] = gl.getUniformLocation(prog, n);
+    const aniso = gl.getExtension('EXT_texture_filter_anisotropic');
+    const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 2048;
+    const white = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, white);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+
+    const cam = { yaw: -0.36, pitch: 0.24, dist: 400, target: [0, 0, 0], fov: 26 * Math.PI / 180 };
+    let VP = m4.ident(), eye = [0, 0, 1];
+
+    function mesh(b) {
+      const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(b.d), gl.STATIC_DRAW);
+      const ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(b.i), gl.STATIC_DRAW);
+      return { vbo, ibo, count: b.i.length };
+    }
+    function freeMesh(m) { if (m) { gl.deleteBuffer(m.vbo); gl.deleteBuffer(m.ibo); } }
+    function texture(cv, repeat) {
+      let src = cv;
+      if (cv.width > maxTex || cv.height > maxTex) {
+        const k = maxTex / Math.max(cv.width, cv.height), c2 = document.createElement('canvas');
+        c2.width = Math.max(1, Math.round(cv.width * k)); c2.height = Math.max(1, Math.round(cv.height * k));
+        c2.getContext('2d').drawImage(cv, 0, 0, c2.width, c2.height); src = c2;
+      }
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      const w = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, w); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, w);
+      if (aniso) gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) || 1));
+      return t;
+    }
+    function freeTexture(t) { if (t) gl.deleteTexture(t); }
+
+    function size() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.max(2, Math.round(canvas.clientWidth * dpr)), h = Math.max(2, Math.round(canvas.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      return [w, h];
+    }
+    function updateCam() {
+      const [w, h] = size();
+      const cp = Math.cos(cam.pitch), d = cam.dist;
+      eye = [cam.target[0] + d * Math.sin(cam.yaw) * cp, cam.target[1] + d * Math.sin(cam.pitch), cam.target[2] + d * Math.cos(cam.yaw) * cp];
+      const P = m4.perspective(cam.fov, w / h, Math.max(2, d * 0.15), d + 700), Vw = m4.lookAt(eye, cam.target, [0, 1, 0]);
+      VP = m4.mul(P, Vw);
+      return [w, h, Vw];
+    }
+    function norm(v) { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+
+    function render(parts, models) {
+      const [w, h, Vw] = updateCam();
+      gl.viewport(0, 0, w, h);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+      gl.useProgram(prog);
+      gl.uniformMatrix4fv(U.uVP, false, VP);
+      gl.uniform3fv(U.uEye, eye);
+      const R = [Vw[0], Vw[4], Vw[8]], Up = [Vw[1], Vw[5], Vw[9]], Fw = [Vw[2], Vw[6], Vw[10]];
+      const mix = (a, b, c) => norm([R[0] * a + Up[0] * b + Fw[0] * c, R[1] * a + Up[1] * b + Fw[1] * c, R[2] * a + Up[2] * b + Fw[2] * c]);
+      gl.uniform3fv(U.uL, mix(0.3, 0.55, 0.78));
+      gl.uniform3fv(U.uL2, mix(-0.6, 0.1, 0.6));
+      gl.uniform1i(U.uTex, 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);
+      const I = m4.ident();
+      for (const p of parts) {
+        if (!p || !p.mesh || p.hidden) continue;
+        gl.uniformMatrix4fv(U.uM, false, (models && models[p.group]) || I);
+        gl.uniform3fv(U.uColor, p.color || [1, 1, 1]);
+        gl.uniform1f(U.uUseTex, p.tex ? 1 : 0);
+        gl.uniform1f(U.uSpec, p.spec === undefined ? 0.35 : p.spec);
+        gl.bindTexture(gl.TEXTURE_2D, p.tex || white);
+        gl.bindBuffer(gl.ARRAY_BUFFER, p.mesh.vbo);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 12);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 32, 24);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.mesh.ibo);
+        gl.drawElements(gl.TRIANGLES, p.mesh.count, gl.UNSIGNED_SHORT, 0);
+      }
+    }
+    /* punto del modelo -> pixeles CSS */
+    function project(p) {
+      updateCam();
+      const q = m4.point(VP, p);
+      return [(q[0] * 0.5 + 0.5) * canvas.clientWidth, (1 - (q[1] * 0.5 + 0.5)) * canvas.clientHeight];
+    }
+    /* rayo desde un pixel CSS */
+    function ray(px, py) {
+      updateCam();
+      const inv = m4.invert(VP);
+      if (!inv) return null;
+      const nx = px / canvas.clientWidth * 2 - 1, ny = 1 - py / canvas.clientHeight * 2;
+      const a = m4.point(inv, [nx, ny, -1]), b = m4.point(inv, [nx, ny, 1]);
+      return { o: a, d: norm([b[0] - a[0], b[1] - a[1], b[2] - a[2]]) };
+    }
+    function hitBox(r, bx) { // bx: [x0,y0,z0,x1,y1,z1]
+      let t0 = -Infinity, t1 = Infinity;
+      for (let k = 0; k < 3; k++) {
+        const o = r.o[k], d = r.d[k], lo = bx[k], hi = bx[k + 3];
+        if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) return null; continue; }
+        let a = (lo - o) / d, b = (hi - o) / d;
+        if (a > b) { const s = a; a = b; b = s; }
+        if (a > t0) t0 = a; if (b < t1) t1 = b;
+        if (t0 > t1) return null;
+      }
+      return t1 < 0 ? null : t0;
+    }
+    /* encuadra un rectángulo del modelo (ancho x alto en mm) */
+    function frame(center, wmm, hmm) {
+      const a = canvas.clientWidth / Math.max(1, canvas.clientHeight), t = Math.tan(cam.fov / 2);
+      cam.target = center.slice();
+      cam.dist = Math.max(wmm / (2 * t * a), hmm / (2 * t));
+    }
+    return { gl, cam, mesh, freeMesh, texture, freeTexture, render, project, ray, hitBox, frame, size, lost: () => gl.isContextLost() };
+  }
+
+  window.MS3D = { create, Builder, m4 };
+})();
+</script>
+<script>
+/* Instrumentos: geometría 3D, escalas, lupa y cálculo de lecturas. Expone window.MSIM. */
+(function () {
+  'use strict';
+  const E3 = window.MS3D;
+  const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+  const TAU = Math.PI * 2;
+
+  /* ---------- Catálogo de instrumentos ---------- */
+  const MODELS = {
+    vA: {
+      id: 'vA', kind: 'vernier', title: 'Vernier 0.05 mm · 1/128 in', short: 'Vernier 0.05 mm · 1/128 in', inMain: 16,
+      scales: {
+        mm: { key: 'mm', unit: 'mm', kind: 'dec', dec: 2, per: 20, n: 20, mainPer: 20, vdiv: 1.95, mainDiv: 1, stepMm: 0.05, labEvery: 2, lab: (k) => k / 2, tag: '0.05 mm', max: 3000, coarse: '1 mm', fine: '0.05' },
+        in: { key: 'in', unit: 'in', kind: 'frac', per: 128, n: 8, mainPer: 8, vdiv: 25.4 * 7 / 128, mainDiv: 25.4 / 16, stepMm: 25.4 / 128, labEvery: 4, lab: (k) => k, tag: '1/128 in', max: 755, coarse: '1/16', fine: '1/128' }
+      }
+    },
+    vB: {
+      id: 'vB', kind: 'vernier', title: 'Vernier 0.02 mm · 0.001 in', short: 'Vernier 0.02 mm · 0.001 in', inMain: 40,
+      scales: {
+        mm: { key: 'mm', unit: 'mm', kind: 'dec', dec: 2, per: 50, n: 50, mainPer: 50, vdiv: 0.98, mainDiv: 1, stepMm: 0.02, labEvery: 5, lab: (k) => k / 5, tag: '0.02 mm', max: 7500, coarse: '1 mm', fine: '0.02' },
+        in: { key: 'in', unit: 'in', kind: 'dec', dec: 3, per: 1000, n: 25, mainPer: 25, vdiv: 0.049 * 25.4, mainDiv: 0.635, stepMm: 0.0254, labEvery: 5, lab: (k) => k, tag: '0.001 in', max: 5900, coarse: '0.025', fine: '0.001' }
+      }
+    },
+    mM: {
+      id: 'mM', kind: 'mic', title: 'Micrómetro 0–25 mm · 0.01 mm', short: 'Micrómetro 0.01 mm',
+      scales: { mm: { key: 'mm', unit: 'mm', kind: 'dec', dec: 2, per: 100, perRev: 50, stepMm: 0.01, tag: '0.01 mm', max: 2500, coarse: '0.5 mm', fine: '0.01' } }
+    },
+    mI: {
+      id: 'mI', kind: 'mic', title: 'Micrómetro 0–1 in · 0.001 in', short: 'Micrómetro 0.001 in',
+      scales: { in: { key: 'in', unit: 'in', kind: 'dec', dec: 3, per: 1000, perRev: 25, stepMm: 0.0254, tag: '0.001 in', max: 1000, coarse: '0.025', fine: '0.001' } }
+    }
+  };
+
+  /* ---------- Formato y lectura ---------- */
+  function gcd(a, b) { while (b) { const t = a % b; a = b; b = t; } return a || 1; }
+  function frac(num, den) {
+    if (num === 0) return '0';
+    const w = Math.floor(num / den), r = num % den;
+    if (!r) return String(w);
+    const g = gcd(r, den);
+    return (w ? w + ' ' : '') + (r / g) + '/' + (den / g);
+  }
+  function fmt(sc, count) {
+    if (sc.kind === 'frac') return frac(count, sc.per) + ' in';
+    return (count / sc.per).toFixed(sc.dec) + ' ' + sc.unit;
+  }
+  /* pasos de lectura: [{t: texto, v: valor, c: 'a'|'b'|''}] */
+  function breakdown(md, sc, count) {
+    const st = [];
+    if (md.kind === 'vernier') {
+      const m = Math.floor(count / sc.mainPer), k = count % sc.mainPer;
+      if (sc.unit === 'mm') {
+        st.push({ t: 'Regla: última marca a la izquierda del 0 del vernier', v: m + ' mm', c: 'a' });
+        st.push({ t: 'Vernier: la línea n.º ' + k + ' coincide con una marca de la regla', v: k + ' × ' + sc.fine + ' = ' + (k / sc.per).toFixed(2) + ' mm', c: 'b' });
+        st.push({ t: 'Suma', v: m + ' + ' + (k / sc.per).toFixed(2) + ' = ' + fmt(sc, count), c: '' });
+      } else if (sc.kind === 'frac') {
+        st.push({ t: 'Regla: ' + m + ' divisiones de 1/16 antes del 0 del vernier', v: frac(m, 16) + ' in', c: 'a' });
+        st.push({ t: 'Vernier: la línea n.º ' + k + ' coincide con una marca de la regla', v: k + '/128 in', c: 'b' });
+        st.push({ t: 'Suma en 128avos y simplifica', v: (m * 8) + '/128 + ' + k + '/128 = ' + count + '/128 = ' + fmt(sc, count), c: '' });
+      } else {
+        const inch = Math.floor(m / 40), ten = Math.floor((m % 40) / 4), q = m % 4;
+        st.push({ t: 'Regla: pulgadas enteras', v: inch + '.000', c: 'a' });
+        st.push({ t: 'Regla: décimas (número pequeño ' + ten + ')', v: (ten / 10).toFixed(3), c: 'a' });
+        st.push({ t: 'Regla: ' + q + ' divisiones de 0.025 después del número', v: (q * 0.025).toFixed(3), c: 'a' });
+        st.push({ t: 'Vernier: la línea n.º ' + k + ' coincide con una marca de la regla', v: (k / 1000).toFixed(3), c: 'b' });
+        st.push({ t: 'Suma', v: fmt(sc, count), c: '' });
+      }
+    } else if (sc.unit === 'mm') {
+      const e = Math.floor(count / 100), half = (count % 100) >= 50, th = count % 50;
+      st.push({ t: 'Cilindro: milímetros enteros visibles (marcas de arriba)', v: e + ' mm', c: 'a' });
+      st.push({ t: half ? 'Cilindro: sí aparece la marca de medio milímetro (abajo)' : 'Cilindro: no aparece otra marca de medio milímetro', v: half ? '0.50 mm' : '0.00 mm', c: 'a' });
+      st.push({ t: 'Tambor: división ' + th + ' frente a la línea de referencia', v: th + ' × 0.01 = ' + (th / 100).toFixed(2) + ' mm', c: 'b' });
+      st.push({ t: 'Suma', v: fmt(sc, count), c: '' });
+    } else {
+      const ten = Math.floor(count / 100), q = Math.floor((count % 100) / 25), th = count % 25;
+      st.push({ t: 'Cilindro: último número visible (' + (ten % 10) + ')', v: (ten / 10).toFixed(3), c: 'a' });
+      st.push({ t: 'Cilindro: ' + q + ' divisiones de 0.025 después del número', v: (q * 0.025).toFixed(3), c: 'a' });
+      st.push({ t: 'Tambor: división ' + th + ' frente a la línea de referencia', v: (th / 1000).toFixed(3), c: 'b' });
+      st.push({ t: 'Suma', v: fmt(sc, count), c: '' });
+    }
+    return st;
+  }
+  /* texto del alumno -> valor en la unidad de la escala (o null) */
+  function parseAnswer(str) {
+    let s = String(str || '').trim().toLowerCase().replace(/,/g, '.');
+    s = s.replace(/\s*(mm|in|pulgadas?|pulg\.?|"|”|″)\s*$/, '').trim();
+    if (!s) return null;
+    let m;
+    if ((m = s.match(/^(\d+)\s*[\s+\-]\s*(\d+)\s*\/\s*(\d+)$/))) return +m[3] ? +m[1] + (+m[2]) / (+m[3]) : null;
+    if ((m = s.match(/^(\d+)\s*\/\s*(\d+)$/))) return +m[2] ? (+m[1]) / (+m[2]) : null;
+    if (/^(\d+\.?\d*|\.\d+)$/.test(s)) return parseFloat(s);
+    return null;
+  }
+  /* compara y diagnostica. Devuelve {ok, msg} */
+  function check(md, sc, target, value) {
+    const c = value * sc.per, r = Math.round(c);
+    const tol = sc.kind === 'frac' ? 0.07 : 0.05;
+    if (Math.abs(c - target) < tol) return { ok: true };
+    if (Math.abs(c - r) > tol) {
+      return { ok: false, msg: 'Tu respuesta no es una lectura posible: con esta escala las lecturas avanzan de ' + sc.fine + ' en ' + sc.fine + ' ' + sc.unit + '.' };
+    }
+    const d = r - target;
+    if (md.kind === 'vernier') {
+      if (d % sc.mainPer === 0) return { ok: false, msg: 'La parte del vernier es correcta. Revisa la regla: toma la última marca que queda a la izquierda del 0 del vernier.' };
+      if (Math.floor(r / sc.mainPer) === Math.floor(target / sc.mainPer)) return { ok: false, msg: 'La lectura de la regla es correcta. Busca de nuevo la línea del vernier que coincide exactamente con una marca de la regla.' };
+      return { ok: false, msg: 'Revisa los dos pasos: primero la regla (antes del 0 del vernier) y después la línea del vernier que coincide.' };
+    }
+    if (sc.unit === 'mm') {
+      if (Math.abs(d) === 50) {
+        return { ok: false, msg: d < 0 ? 'Te faltan 0.50 mm: observa si ya apareció la marca de medio milímetro (las marcas de abajo).' : 'Te sobran 0.50 mm: la marca de medio milímetro todavía no queda descubierta. Si el tambor marca cerca de 50, esa marca aún no se cuenta.' };
+      }
+      if (d % 50 === 0) return { ok: false, msg: 'La lectura del tambor es correcta. Cuenta otra vez los milímetros y medios milímetros visibles en el cilindro.' };
+      if (Math.floor(r / 50) === Math.floor(target / 50)) return { ok: false, msg: 'La lectura del cilindro es correcta. Revisa qué división del tambor queda frente a la línea de referencia.' };
+    } else {
+      if (d % 25 === 0) return { ok: false, msg: 'La lectura del tambor es correcta. Cuenta otra vez el número y las divisiones de 0.025 visibles en el cilindro.' };
+      if (Math.floor(r / 25) === Math.floor(target / 25)) return { ok: false, msg: 'La lectura del cilindro es correcta. Revisa qué división del tambor queda frente a la línea de referencia.' };
+    }
+    return { ok: false, msg: 'Revisa los pasos: primero el cilindro y después el tambor.' };
+  }
+
+  /* ---------- Dibujo 2D de escalas (texturas y lupa) ---------- */
+  const V = { T: 3, H: 28, XL: -16, E: 222, Z0: 14, SL: 66, P: 0.6 };
+  const MC = { X0: 44, EDGE: 0.06, RS: 6, RB0: 6.25, RB1: 9, BL: 7 };
+  const INK = '#11151a', INK2 = '#3b424b', STEEL = '#d2d6db', PLATE = '#e7eaed', DARK = '#9aa1a9';
+  const GA = '#1766d6', GB = '#e8590c';
+
+  function Pen(ctx, xmin, ymax, kx, ky) {
+    const X = (x) => (x - xmin) * kx, Y = (y) => (ymax - y) * ky;
+    return {
+      ctx, X, Y, kx, ky,
+      rect(x0, y0, x1, y1, fill) { ctx.fillStyle = fill; ctx.fillRect(X(x0), Y(y1), (x1 - x0) * kx, (y1 - y0) * ky); },
+      vline(x, y0, y1, w, color) { ctx.fillStyle = color; const px = Math.max(1, w * kx); ctx.fillRect(X(x) - px / 2, Y(Math.max(y0, y1)), px, Math.abs(y1 - y0) * ky); },
+      hline(x0, x1, y, w, color) { ctx.fillStyle = color; const px = Math.max(1, w * ky); ctx.fillRect(X(x0), Y(y) - px / 2, (x1 - x0) * kx, px); },
+      text(s, x, y, size, align, color, weight) {
+        ctx.save(); ctx.translate(X(x), Y(y)); ctx.scale(kx / ky, 1);
+        ctx.font = (weight || 600) + ' ' + (size * ky).toFixed(2) + 'px ' + FONT;
+        ctx.textAlign = align || 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = color; ctx.fillText(s, 0, 0); ctx.restore();
+      }
+    };
+  }
+
+  function drawBeam(pen, md, xa, xb) {
+    pen.rect(Math.max(xa, V.XL), 0, Math.min(xb, V.E), V.H, STEEL);
+    for (let i = Math.max(0, Math.floor(xa - V.Z0) - 1); i <= Math.min(150, Math.ceil(xb - V.Z0) + 1); i++) {
+      const x = V.Z0 + i;
+      pen.vline(x, 6, 6 + (i % 10 === 0 ? 4.4 : i % 5 === 0 ? 3.3 : 2.3), 0.13, INK);
+      if (i % 10 === 0) pen.text(String(i), x, 11.3, 2.5, 'center', INK);
+    }
+    pen.text('mm', V.Z0 - 7, 11.3, 2.1, 'center', INK2);
+    pen.text('in', V.Z0 - 7, 15.2, 2.1, 'center', INK2);
+    if (md.inMain === 16) {
+      const d = 25.4 / 16;
+      for (let j = Math.max(0, Math.floor((xa - V.Z0) / d) - 2); j <= Math.min(96, Math.ceil((xb - V.Z0) / d) + 1); j++) {
+        const x = V.Z0 + j * d, len = j % 16 === 0 ? 4.4 : j % 8 === 0 ? 3.5 : j % 4 === 0 ? 2.8 : j % 2 === 0 ? 2.2 : 1.6;
+        pen.vline(x, 22 - len, 22, 0.13, INK);
+        if (j % 16 === 0) pen.text(String(j / 16), x + 0.55, 14.9, 2.5, 'left', INK);
+      }
+    } else {
+      const d = 0.635;
+      for (let j = Math.max(0, Math.floor((xa - V.Z0) / d) - 4); j <= Math.min(240, Math.ceil((xb - V.Z0) / d) + 4); j++) {
+        const x = V.Z0 + j * d, len = j % 40 === 0 ? 4.4 : j % 4 === 0 ? 3.2 : 2.0;
+        pen.vline(x, 22 - len, 22, 0.12, INK);
+        if (j % 40 === 0) pen.text(String(j / 40), x, 14.9, 2.5, 'center', INK);
+        else if (j % 4 === 0) pen.text(String((j / 4) % 10), x, 17.2, 1.7, 'center', INK);
+      }
+    }
+  }
+  function drawPlate(pen, sc, s, lower) {
+    const y0 = lower ? 0 : 22, y1 = y0 + 6;
+    pen.rect(s, y0, s + V.SL, y1, PLATE);
+    for (let k = 0; k <= sc.n; k++) {
+      const x = s + V.Z0 + k * sc.vdiv, big = k % sc.labEvery === 0;
+      const len = big ? (sc.n === 50 && k % 10 !== 0 ? 2.7 : 3.1) : 1.9;
+      if (lower) pen.vline(x, 6 - len, 6, 0.13, INK); else pen.vline(x, 22, 22 + len, 0.13, INK);
+      if (big) pen.text(String(sc.lab(k)), x, lower ? 0.75 : 25.6, 1.85, 'center', INK);
+    }
+    pen.text(sc.tag, s + 7.4, lower ? 2.2 : 24.2, 1.45, 'center', INK2);
+  }
+
+  function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+
+  function vernierTextures(md) {
+    const beam = canvas(4096, 512);
+    drawBeam(Pen(beam.getContext('2d'), V.XL, V.H, 4096 / (V.E - V.XL), 512 / V.H), md, V.XL, V.E);
+    const lo = canvas(1024, 128), hi = canvas(1024, 128);
+    drawPlate(Pen(lo.getContext('2d'), 0, 6, 1024 / V.SL, 128 / 6), md.scales.mm, 0, true);
+    drawPlate(Pen(hi.getContext('2d'), 0, 28, 1024 / V.SL, 128 / 6), md.scales.in, 0, false);
+    return { beam, lo, hi };
+  }
+
+  function sleeveTicks(sc) { // [{x (mm desde el cero), up, len, label}]
+    const out = [];
+    if (sc.unit === 'mm') {
+      for (let m = 0; m <= 25; m++) out.push({ x: m, up: true, len: m % 5 === 0 ? 2.7 : 1.8, label: m % 5 === 0 ? String(m) : '' });
+      for (let m = 0; m < 25; m++) out.push({ x: m + 0.5, up: false, len: 1.6, label: '' });
+    } else {
+      for (let j = 0; j <= 40; j++) out.push({ x: j * 0.635, up: true, len: j % 4 === 0 ? 2.7 : 1.6, label: j % 4 === 0 ? String((j / 4) % 10) : '' });
+    }
+    return out;
+  }
+  function micTextures(md) {
+    const sc = md.scales.mm || md.scales.in, C = Math.PI * MC.RS;
+    const sl = canvas(1024, 1024), ctx = sl.getContext('2d');
+    const pen = Pen(ctx, 40, C, 1024 / 34, 1024 / (2 * C));
+    pen.rect(40, -C, 74, C, '#cdd1d6');
+    pen.hline(MC.X0 - 2.2, MC.X0 + (sc.unit === 'mm' ? 25 : 25.4) + 0.8, 0, 0.13, INK);
+    for (const t of sleeveTicks(sc)) {
+      pen.vline(MC.X0 + t.x, 0, t.up ? t.len : -t.len, 0.12, INK);
+      if (t.label) pen.text(t.label, MC.X0 + t.x, 3.15, 1.7, 'center', INK);
+    }
+    pen.text(sc.tag, MC.X0 + 12, -4.6, 1.5, 'center', INK2);
+    /* tambor: X = ángulo, Y = eje */
+    const th = canvas(2048, 256), c2 = th.getContext('2d'), n = sc.perRev, ky = 256 / MC.BL;
+    c2.fillStyle = '#d4d8dd'; c2.fillRect(0, 0, 2048, 256);
+    for (let k = 0; k < n; k++) {
+      for (const off of [-2048, 0, 2048]) {
+        const X = k / n * 2048 + off, big = k % 5 === 0;
+        c2.fillStyle = INK; c2.fillRect(X - 2.6, 0, 5.2, (big ? 2.9 : 1.8) * ky);
+        if (big) {
+          c2.save(); c2.translate(X, 3.35 * ky); c2.rotate(Math.PI / 2);
+          c2.font = '600 80px ' + FONT; c2.textAlign = 'left'; c2.textBaseline = 'middle'; c2.fillStyle = INK; c2.fillText(String(k), 0, 4); c2.restore();
+        }
+      }
+    }
+    const kn = canvas(64, 8), c3 = kn.getContext('2d');
+    for (let i = 0; i < 64; i++) { c3.fillStyle = i % 8 < 4 ? '#c9cdd3' : '#8d949c'; c3.fillRect(i, 0, 1, 8); }
+    return { sleeve: sl, thimble: th, knurl: kn };
+  }
+
+  /* ---------- Escenas 3D ---------- */
+  const COL = { steel: [0.70, 0.72, 0.77], steel2: [0.56, 0.59, 0.65], dark: [0.34, 0.37, 0.42], paint: [0.13, 0.36, 0.44], brass: [0.88, 0.62, 0.20], cut: [0.97, 0.80, 0.46] };
+
+  function buildScene(eng, id) {
+    const md = MODELS[id], B = E3.Builder, parts = [], texs = [];
+    const add = (b, group, color, spec, tex) => { const p = { mesh: eng.mesh(b), group, color, spec, tex: tex || null }; parts.push(p); return p; };
+    const tex = (cv, rep) => { const t = eng.texture(cv, rep); texs.push(t); return t; };
+    let pieceParts = [];
+    const sc = { md, parts };
+
+    if (md.kind === 'vernier') {
+      const T = vernierTextures(md), z1 = V.T + V.P;
+      add(new B().box(V.XL, 0, 0, V.E, V.H, V.T).extrude([[0, 0], [-16, 0], [-16, -10], [-4, -40], [0, -40]], 0, V.T), 'fixed', COL.steel, 0.5);
+      add(new B().extrude([[0, 28], [5, 28], [5, 39], [0, 44]], 0, 1.5), 'fixed', COL.steel2, 0.5);
+      add(new B().quadXY(V.XL, 0, V.E, V.H, V.T + 0.02), 'fixed', null, 0.18, tex(T.beam));
+      add(new B().box(0, 6, V.T, 2, 22, z1).box(64, 6, V.T, 66, 22, z1)
+        .box(0, -4, -0.8, 66, 0, z1).box(-5, 28, 1.5, 66, 31, z1).box(0, -4, -0.8, 66, 31, 0)
+        .extrude([[0, 0], [0, -40], [4, -40], [14, -10], [14, 0]], 0, V.T)
+        .extrude([[-5, 28], [0, 28], [0, 44], [-5, 39]], 1.5, V.T), 'slider', COL.steel2, 0.5);
+      add(new B().cylinder([48, -7, 0], 'z', -0.4, z1 + 0.5, 4.2, 28).cylinder([30, 31, 1.6], 'y', 0, 4, 2.7, 20), 'slider', COL.dark, 0.3);
+      add(new B().box(V.E - 170, 12.5, 0.8, V.E, 15.5, 2.2), 'slider', COL.steel2, 0.5);
+      add(new B().quadXY(0, 0, 66, 6, V.T + 0.06), 'slider', null, 0.18, tex(T.lo));
+      add(new B().quadXY(0, 22, 66, 28, V.T + 0.06), 'slider', null, 0.18, tex(T.hi));
+      sc.models = (count, s) => ({ slider: E3.m4.translate(s.stepMm * count, 0, 0) });
+      sc.pick = (posMm) => [[posMm, -4, -1, posMm + 66, 31, 4.2], [posMm, -40, -0.5, posMm + 14, 0, 3.5], [posMm - 5, 28, 1, posMm, 44, 3.5], [posMm + 43, -12, -1, posMm + 53, -3, 4.8]];
+      sc.view = (posMm, s, zoomed, piece) => {
+        if (zoomed) { const span = s.n * s.vdiv; return { c: [posMm + V.Z0 + span / 2 - 4, s.unit === 'mm' ? 8 : 20, 1.5], w: span + 30, h: 34 }; }
+        const extra = piece && piece.measure === 'profundidad' ? piece.dim + 14 : 0;
+        return { c: [103 + extra / 2, piece && piece.measure === 'interior' ? 6 : 2, 1.5], w: 252 + extra, h: piece && piece.measure === 'interior' ? 108 : 96 };
+      };
+      sc.setPiece = (piece) => {
+        for (const p of pieceParts) { eng.freeMesh(p.mesh); parts.splice(parts.indexOf(p), 1); }
+        pieceParts = [];
+        if (!piece) return;
+        const D = piece.dim;
+        if (piece.measure === 'interior') {
+          const o = [D / 2, 0, 1.5], ri = D / 2, ro = D / 2 + 5, a0 = Math.PI / 2, a1 = 3 * Math.PI / 2;
+          pieceParts.push(add(new B().lathe(o, 'y', [[33, ro], [58, ro]], 40, a0, a1).lathe(o, 'y', [[33, ri], [58, ri]], 40, a0, a1)
+            .disc(o, 'y', 33, ri, ro, 40, -1, a0, a1).disc(o, 'y', 58, ri, ro, 40, 1, a0, a1), 'piece', COL.brass, 0.3));
+          pieceParts.push(add(new B().face([D, 33, 1.5], [D + 5, 33, 1.5], [D + 5, 58, 1.5], [D, 58, 1.5], [0, 0, 1])
+            .face([-5, 33, 1.5], [0, 33, 1.5], [0, 58, 1.5], [-5, 58, 1.5], [0, 0, 1]), 'piece', COL.cut, 0.1));
+        } else if (piece.measure === 'profundidad') {
+          pieceParts.push(add(new B().box(V.E + D, -3, -8, V.E + D + 10, 31, 11).box(V.E, -3, -8, V.E + D, 8, 11).box(V.E, 20, -8, V.E + D, 31, 11), 'piece', COL.brass, 0.3));
+        } else if (piece.shape === 'cilindro') {
+          pieceParts.push(add(new B().cylinder([D / 2, 0, 1.5], 'y', -38, -7, D / 2, 56), 'piece', COL.brass, 0.35));
+        } else {
+          pieceParts.push(add(new B().box(0, -36, -9, D, -7, 12), 'piece', COL.brass, 0.3));
+        }
+      };
+    } else {
+      const T = micTextures(md), o = [0, 0, 0], X0 = MC.X0, xe = X0 + MC.EDGE;
+      add(new B().extrude([[-16, 7], [-16, -30], [-6, -44], [30, -44], [40, -30], [40, 7], [29, 7], [29, -20], [22, -30], [2, -30], [-5, -20], [-5, 7]], -3.5, 3.5), 'fixed', COL.paint, 0.25);
+      add(new B().cylinder(o, 'x', -5.2, 0, 3.25, 32).cylinder(o, 'x', 36, 41, 7.2, 40), 'fixed', COL.steel, 0.5);
+      add(new B().lathe([40, 0, 0], 'x', [[0, MC.RS], [34, MC.RS]], 64, -Math.PI, Math.PI, (tf, af) => [tf, 1 - af]), 'fixed', null, 0.25, tex(T.sleeve));
+      add(new B().cylinder(o, 'x', 0, 45, 3.25, 32), 'spindle', COL.steel, 0.55);
+      add(new B().lathe([xe, 0, 0], 'x', [[0, MC.RB0], [MC.BL, MC.RB1]], 100, 0, TAU, (tf, af) => [af, tf]), 'thimble', null, 0.25, tex(T.thimble));
+      add(new B().disc([xe, 0, 0], 'x', 0, MC.RS + 0.02, MC.RB0, 64, -1).disc([xe, 0, 0], 'x', 34, 4.5, MC.RB1, 48, 1)
+        .lathe([xe, 0, 0], 'x', [[34, 4.5], [42, 4.5]], 32).disc([xe, 0, 0], 'x', 42, 4.5, 5.6, 32, -1).disc([xe, 0, 0], 'x', 48, 0, 5.6, 32, 1), 'thimble', COL.steel2, 0.5);
+      const kt = tex(T.knurl, true);
+      add(new B().lathe([xe, 0, 0], 'x', [[MC.BL, MC.RB1], [34, MC.RB1]], 64, 0, TAU, (tf, af) => [af * 14, tf]), 'thimble', null, 0.3, kt);
+      add(new B().lathe([xe, 0, 0], 'x', [[42, 5.6], [48, 5.6]], 48, 0, TAU, (tf, af) => [af * 9, tf]), 'thimble', null, 0.3, kt);
+      sc.models = (count, s) => {
+        const tr = E3.m4.translate(s.stepMm * count, 0, 0);
+        return { spindle: tr, thimble: E3.m4.mul(tr, E3.m4.rotX(TAU * count / s.perRev)) };
+      };
+      sc.pick = (posMm) => [[X0 + posMm, -9.5, -9.5, X0 + posMm + 48, 9.5, 9.5], [posMm, -3.6, -3.6, 29, 3.6, 3.6]];
+      sc.view = (posMm, s, zoomed) => zoomed ? { c: [X0 + posMm - 3, 0, 0], w: 48, h: 27 } : { c: [51, -17, 0], w: 146, h: 64 };
+      sc.setPiece = (piece) => {
+        for (const p of pieceParts) { eng.freeMesh(p.mesh); parts.splice(parts.indexOf(p), 1); }
+        pieceParts = [];
+        if (!piece) return;
+        const D = piece.dim, b = new B();
+        if (piece.shape === 'esfera') b.sphere([D / 2, 0, 0], D / 2, 48);
+        else if (piece.shape === 'cilindro') b.cylinder([D / 2, 0, 0], 'z', -11, 11, D / 2, 48);
+        else if (piece.shape === 'lamina') b.box(0, -16, -11, D, 12, 11);
+        else b.box(0, -9, -8, D, 9, 8);
+        pieceParts.push(add(b, 'piece', COL.brass, 0.35));
+      };
+    }
+    sc.dispose = () => { for (const p of parts) eng.freeMesh(p.mesh); for (const t of texs) eng.freeTexture(t); parts.length = 0; };
+    return sc;
+  }
+
+  /* ---------- Lupa de lectura (2D) ---------- */
+  function drawLens(cv, o) {
+    const md = MODELS[o.model], sc = md.scales[o.unit], W = cv.clientWidth, H = cv.clientHeight;
+    if (W < 4 || H < 4) return null;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#1b222b'; ctx.fillRect(0, 0, W, H);
+    const pos = o.count * sc.stepMm;
+    let k, xmin;
+    if (md.kind === 'vernier') {
+      const lower = sc.unit === 'mm', span = sc.n * sc.vdiv, y0 = lower ? -1.2 : 13.4, y1 = lower ? 14.4 : 29.2;
+      k = Math.min(H / (y1 - y0), W / (span + 13)) * o.zoom;
+      const cx = pos + V.Z0 + span / 2 - 1.5 + o.pan;
+      xmin = cx - W / (2 * k);
+      const xmax = xmin + W / k, ymax = (y0 + y1) / 2 + H / (2 * k), pen = Pen(ctx, xmin, ymax, k, k);
+      drawBeam(pen, md, xmin, xmax);
+      /* corredera */
+      if (lower) pen.rect(pos, -4, pos + V.SL, 0, DARK); else pen.rect(pos - 5, 28, pos + V.SL, 31, DARK);
+      pen.rect(pos, 6, pos + 2, 22, DARK); pen.rect(pos + 64, 6, pos + 66, 22, DARK);
+      drawPlate(pen, sc, pos, lower);
+      if (!lower) drawPlate(pen, md.scales.mm, pos, true); else drawPlate(pen, md.scales.in, pos, false);
+      /* la otra escala queda atenuada */
+      ctx.fillStyle = 'rgba(27,34,43,0.55)';
+      if (lower) ctx.fillRect(0, 0, W, pen.Y(13.6)); else ctx.fillRect(0, pen.Y(13.6), W, H);
+      if (o.guides) {
+        const m = Math.floor(o.count / sc.mainPer), kk = o.count % sc.mainPer;
+        const xm = V.Z0 + m * sc.mainDiv, xz = pos + V.Z0, xc = xz + kk * sc.vdiv;
+        const ya = lower ? 6 : 22, dir = lower ? 1 : -1;
+        pen.vline(xm, ya, ya + dir * 4.6, 0.3, GA);
+        ctx.strokeStyle = GA; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(pen.X(xz), pen.Y(ya - dir * 4.4)); ctx.lineTo(pen.X(xz), pen.Y(ya + dir * 6.4)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(232,89,12,0.30)';
+        ctx.fillRect(pen.X(xc) - 0.45 * k, pen.Y(ya + (lower ? 5 : 3.4)), 0.9 * k, 8.4 * k);
+        ctx.strokeStyle = GB; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pen.X(xc), pen.Y(ya), Math.max(5, 0.75 * k), 0, TAU); ctx.stroke();
+      }
+    } else {
+      const X0 = MC.X0, xe = X0 + pos + MC.EDGE, full = sc.unit === 'mm' ? 25 : 25.4;
+      k = Math.min(H / 14.6, W / 24) * o.zoom;
+      const Wmm = W / k;
+      xmin = Wmm >= full + 17 ? X0 - 4 : Math.max(X0 - 4, xe + 11 - Wmm);
+      xmin += o.pan;
+      const xmax = xmin + Wmm, pen = Pen(ctx, xmin, H / (2 * k), k, k);
+      const cyl = (x0, x1, r, c0, c1) => {
+        const g = ctx.createLinearGradient(0, pen.Y(r), 0, pen.Y(-r));
+        g.addColorStop(0, c1); g.addColorStop(0.42, c0); g.addColorStop(0.62, c0); g.addColorStop(1, c1);
+        ctx.fillStyle = g; ctx.fillRect(pen.X(x0), pen.Y(r), (x1 - x0) * k, 2 * r * k);
+      };
+      cyl(Math.max(xmin, 40), Math.min(xe, 74), MC.RS, '#d9dde1', '#8f969e');
+      /* cilindro (manguito) */
+      ctx.save(); ctx.beginPath(); ctx.rect(pen.X(xmin), 0, (xe - xmin) * k, H); ctx.clip();
+      pen.hline(X0 - 2.2, X0 + full + 0.8, 0, 0.13, INK);
+      for (const t of sleeveTicks(sc)) {
+        pen.vline(X0 + t.x, 0, t.up ? t.len : -t.len, 0.12, INK);
+        if (t.label) pen.text(t.label, X0 + t.x, 3.15, 1.7, 'center', INK);
+      }
+      if (o.guides) {
+        const per = sc.unit === 'mm' ? 50 : 25, j = Math.floor(o.count / per), xl = X0 + j * (sc.unit === 'mm' ? 0.5 : 0.635);
+        const up = sc.unit === 'mm' ? j % 2 === 0 : true;
+        pen.vline(xl, 0, up ? 2.9 : -1.9, 0.3, GA);
+      }
+      ctx.restore();
+      /* tambor */
+      const n = sc.perRev, rot = TAU * o.count / n;
+      ctx.save(); ctx.beginPath();
+      ctx.moveTo(pen.X(xe), pen.Y(MC.RB0)); ctx.lineTo(pen.X(xe + MC.BL), pen.Y(MC.RB1)); ctx.lineTo(pen.X(xmax + 1), pen.Y(MC.RB1));
+      ctx.lineTo(pen.X(xmax + 1), pen.Y(-MC.RB1)); ctx.lineTo(pen.X(xe + MC.BL), pen.Y(-MC.RB1)); ctx.lineTo(pen.X(xe), pen.Y(-MC.RB0)); ctx.closePath(); ctx.clip();
+      cyl(xe, xmax + 1, MC.RB1, '#e2e5e8', '#8f969e');
+      for (let t = 0; t < n; t++) {
+        let ph = t / n * TAU - rot;
+        ph = ph - TAU * Math.round(ph / TAU);
+        if (Math.abs(ph) > 1.42) continue;
+        const sn = Math.sin(ph), cs = Math.cos(ph), big = t % 5 === 0, len = big ? 2.9 : 1.8;
+        const r1 = MC.RB0 + (len / MC.BL) * (MC.RB1 - MC.RB0), hot = o.guides && t === o.count % n;
+        ctx.strokeStyle = hot ? GB : INK; ctx.lineWidth = Math.max(1, (hot ? 0.24 : 0.13) * k * Math.max(0.35, cs));
+        ctx.beginPath(); ctx.moveTo(pen.X(xe), pen.Y(MC.RB0 * sn)); ctx.lineTo(pen.X(xe + len), pen.Y(r1 * sn)); ctx.stroke();
+        if (big) {
+          const rn = MC.RB0 + (4.3 / MC.BL) * (MC.RB1 - MC.RB0);
+          ctx.save(); ctx.translate(pen.X(xe + 3.4), pen.Y(rn * sn)); ctx.scale(1, Math.max(0.2, cs));
+          ctx.font = '600 ' + (1.75 * k).toFixed(2) + 'px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = hot ? GB : INK;
+          ctx.fillText(String(t), 0, 0); ctx.restore();
+        }
+      }
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(17,21,26,0.55)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pen.X(xe), pen.Y(MC.RB0)); ctx.lineTo(pen.X(xe), pen.Y(-MC.RB0)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pen.X(xe + MC.BL), pen.Y(MC.RB1)); ctx.lineTo(pen.X(xe + MC.BL), pen.Y(-MC.RB1)); ctx.stroke();
+    }
+    return { k };
+  }
+
+  window.MSIM = { MODELS, V, MC, fmt, frac, breakdown, parseAnswer, check, buildScene, drawLens, GA, GB };
+})();
+</script>
+<script>
+/* Interfaz del simulador: movimiento, ejercicios, comprobación y retroalimentación. */
+(function () {
+  'use strict';
+  const SIM = window.MSIM, E3 = window.MS3D;
+  const root = document.querySelector('.ms-wrap');
+  if (!root || !SIM || !E3) return;
+  const $ = (s) => root.querySelector(s), $$ = (s) => Array.from(root.querySelectorAll(s));
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  const S = {
+    model: 'vA', unit: 'mm', count: 467, lo: 0, hi: 3000, locked: false,
+    guides: true, show: true, zoomed: false, camZoom: 1, lensZoom: 1, lensPan: 0,
+    act: null, piece: null, rows: [], sig: '', filter: 'sel', results: {}
+  };
+  const CFG = Object.assign({ REGISTRO_URL: '', GRUPOS: [], ACTIVIDAD: 'Práctica de metrología', MOSTRAR_LECTURA_AL_EXPLORAR: false }, window.MS_CONFIG || {});
+  CFG.REGISTRO_URL = String(CFG.REGISTRO_URL || '').trim(); CFG.ACTIVIDAD = String(CFG.ACTIVIDAD || '').trim().slice(0, 60);
+  const md = () => SIM.MODELS[S.model], sc = () => md().scales[S.unit];
+  const posMm = () => S.count * sc().stepMm;
+
+  /* ---------- 3D ---------- */
+  const glc = $('.ms-gl'), lens = $('.ms-lens');
+  const eng = E3.create(glc);
+  let scene = null, raf = 0;
+  if (!eng) { $('.ms-nogl').hidden = false; glc.hidden = true; $('.ms-views').hidden = true; }
+
+  function buildScene() {
+    if (!eng) return;
+    if (scene) scene.dispose();
+    scene = SIM.buildScene(eng, S.model);
+    scene.setPiece(S.piece);
+  }
+  function applyView() {
+    if (!eng || !scene) return;
+    const v = scene.view(posMm(), sc(), S.zoomed, S.piece);
+    eng.frame(v.c, v.w * 1.06, v.h * 1.12);
+    eng.cam.dist /= S.camZoom;
+  }
+  function draw3D() {
+    raf = 0;
+    if (!eng || !scene || glc.clientWidth < 4) return;
+    applyView();
+    eng.render(scene.parts, scene.models(S.count, sc()));
+  }
+  function draw() {
+    if (!raf) raf = requestAnimationFrame(() => { draw3D(); drawLens(); });
+  }
+  let lensInfo = null;
+  function drawLens() {
+    lensInfo = SIM.drawLens(lens, { model: S.model, unit: S.unit, count: S.count, zoom: S.lensZoom, pan: S.lensPan, guides: S.guides });
+  }
+
+  /* ---------- Estado ---------- */
+  function setCount(c) {
+    c = clamp(Math.round(c), S.lo, S.hi);
+    if (c === S.count) return;
+    S.count = c;
+    refresh();
+  }
+  function freeBounds() { S.lo = 0; S.hi = sc().max; S.locked = false; }
+  function setModel(id, unit) {
+    const old = sc(), mm = S.count * old.stepMm, changed = id !== S.model;
+    S.model = id;
+    S.unit = SIM.MODELS[id].scales[unit] ? unit : Object.keys(SIM.MODELS[id].scales)[0];
+    S.count = clamp(Math.round(mm / sc().stepMm), 0, sc().max);
+    S.lensPan = 0;
+    if (changed) { S.zoomed = false; S.camZoom = 1; buildScene(); }
+  }
+  function goFree() {
+    S.act = null; S.piece = null; S.guides = !!CFG.MOSTRAR_LECTURA_AL_EXPLORAR; S.show = !!CFG.MOSTRAR_LECTURA_AL_EXPLORAR;
+    setFeedback(null);
+    if (scene) scene.setPiece(null);
+    freeBounds();
+    S.count = clamp(S.count, S.lo, S.hi);
+    refresh(true);
+  }
+
+  /* ---------- Actividades ---------- */
+  const TXT = {
+    tipo: { lectura: 'Leer el instrumento', pieza: 'Medir una pieza' },
+    rand: {
+      lectura: 'Lee la medida que marca el instrumento.',
+      cilindro: 'Mide el diámetro exterior del eje cilíndrico.', bloque: 'Mide el ancho del bloque.',
+      tubo: 'Mide el diámetro interior del buje con las puntas para interiores.', ranura: 'Mide la profundidad de la ranura con la varilla de profundidad.',
+      esfera: 'Mide el diámetro del balín.', lamina: 'Mide el espesor de la lámina.'
+    }
+  };
+  function start(a) {
+    if (!U.alumno) { needReg(); return; }
+    if (a.target === null || a.target === undefined) return;
+    if (a.model !== S.model || a.unit !== S.unit) setModel(a.model, a.unit);
+    const s = sc();
+    S.act = Object.assign({ attempts: 0, done: false, revealed: false, hint: false }, a);
+    S.guides = false; S.show = false; S.lensPan = 0; S.lensZoom = 1; S.zoomed = a.kind === 'lectura'; S.camZoom = 1;
+    if (eng) { eng.cam.yaw = S.zoomed ? 0 : -0.34; eng.cam.pitch = S.zoomed ? 0 : 0.22; }
+    if (a.kind === 'lectura') {
+      S.piece = null; S.lo = S.hi = a.target; S.count = a.target; S.locked = true;
+    } else {
+      S.piece = { shape: a.shape, measure: a.measure, dim: a.target * s.stepMm };
+      S.locked = false;
+      const st = (mm) => Math.round(mm / s.stepMm);
+      if (md().kind === 'mic') { S.lo = a.target; S.hi = s.max; S.count = Math.min(s.max, a.target + st(4)); }
+      else if (a.measure === 'interior') { S.lo = Math.min(a.target, st(5.2)); S.hi = a.target; S.count = Math.max(S.lo, a.target - st(12)); }
+      else if (a.measure === 'profundidad') { S.lo = 0; S.hi = a.target; S.count = 0; }
+      else { S.lo = a.target; S.hi = s.max; S.count = Math.min(s.max, a.target + st(18)); }
+    }
+    if (scene) scene.setPiece(S.piece);
+    $('.ms-answer').value = '';
+    setFeedback(null);
+    refresh(true);
+    try { $('#modelo-3d').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* sin desplazamiento */ }
+  }
+  function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function startRandom(kind) {
+    if (!U.alumno) { needReg(); return; }
+    const s = sc(), m = md(), st = (mm) => Math.round(mm / s.stepMm);
+    const a = { id: null, random: true, model: S.model, unit: S.unit, kind, shape: '', measure: 'exterior' };
+    if (kind === 'lectura') {
+      a.target = m.kind === 'mic' ? rnd(st(1.5), s.max - st(1)) : rnd(st(6), st(125));
+      a.text = TXT.rand.lectura;
+    } else if (m.kind === 'mic') {
+      a.shape = ['esfera', 'cilindro', 'lamina', 'bloque'][rnd(0, 3)];
+      a.target = a.shape === 'lamina' ? rnd(st(0.3), st(3)) : rnd(st(3), st(23.5));
+      a.text = TXT.rand[a.shape];
+    } else {
+      const pick = [['cilindro', 'exterior', 8, 90], ['bloque', 'exterior', 8, 110], ['tubo', 'interior', 15, 70], ['ranura', 'profundidad', 6, 50]][rnd(0, 3)];
+      a.shape = pick[0]; a.measure = pick[1]; a.target = rnd(st(pick[2]), st(pick[3])); a.text = TXT.rand[a.shape];
+    }
+    a.label = 'Práctica al azar';
+    start(a);
+  }
+  function mapScale(inst, res) {
+    const r = String(res || '').trim().replace(/\s+/g, ' ');
+    if (inst === 'vernier') return { '0.05 mm': ['vA', 'mm'], '1/128 in': ['vA', 'in'], '0.02 mm': ['vB', 'mm'], '0.001 in': ['vB', 'in'] }[r] || null;
+    if (inst === 'micrometro') return { '0.01 mm': ['mM', 'mm'], '0.001 in': ['mI', 'in'] }[r] || null;
+    return null;
+  }
+  /* ---------- Vista: controles ---------- */
+  const modelsEl = $('.ms-models'), unitsEl = $('.ms-units');
+  for (const id of Object.keys(SIM.MODELS)) {
+    const b = el('button', 'ms-btn', SIM.MODELS[id].short); b.type = 'button'; b.dataset.model = id;
+    b.addEventListener('click', () => { setModel(id, S.unit); goFree(); });
+    modelsEl.appendChild(b);
+  }
+  function renderUnits() {
+    unitsEl.replaceChildren();
+    const keys = Object.keys(md().scales);
+    $('.ms-unitlabel').hidden = keys.length < 2; unitsEl.hidden = keys.length < 2;
+    for (const k of keys) {
+      const b = el('button', 'ms-btn', k === 'mm' ? 'Milímetros (' + md().scales[k].tag + ')' : 'Pulgadas (' + md().scales[k].tag + ')');
+      b.type = 'button'; b.setAttribute('aria-pressed', String(k === S.unit));
+      b.addEventListener('click', () => { if (k !== S.unit) { setModel(S.model, k); goFree(); } });
+      unitsEl.appendChild(b);
+    }
+  }
+  const range = $('.ms-range');
+  range.addEventListener('input', () => setCount(+range.value));
+  function stepBy(code) {
+    const s = sc(), big = md().kind === 'mic' ? s.perRev : s.mainPer;
+    setCount(S.count + (code[0] === '-' ? -1 : 1) * (code[1] === 'c' ? big : 1));
+  }
+  for (const b of $$('[data-step]')) {
+    let t1 = 0, t2 = 0;
+    const stop = () => { clearTimeout(t1); clearInterval(t2); };
+    b.addEventListener('pointerdown', (e) => {
+      if (b.disabled) return;
+      e.preventDefault(); stepBy(b.dataset.step); stop();
+      t1 = setTimeout(() => { t2 = setInterval(() => stepBy(b.dataset.step), 55); }, 380);
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, stop);
+    b.addEventListener('click', (e) => { if (e.detail === 0) stepBy(b.dataset.step); });
+  }
+
+  /* ---------- Vista: 3D interacción ---------- */
+  let drag = null, armed = false;
+  function local(e) { const r = glc.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  function overMovable(e) {
+    if (!eng || !scene || S.locked) return false;
+    const p = local(e), r = eng.ray(p[0], p[1]);
+    if (!r) return false;
+    return scene.pick(posMm()).some((bx) => eng.hitBox(r, bx) !== null);
+  }
+  if (eng) {
+    glc.addEventListener('pointerdown', (e) => {
+      armed = true;
+      if (overMovable(e)) {
+        const t = eng.cam.target, a = eng.project(t), b = eng.project([t[0] + 1, t[1], t[2]]);
+        drag = { mode: 'move', x: e.clientX, y: e.clientY, c0: S.count, ax: b[0] - a[0], ay: b[1] - a[1] };
+      } else drag = { mode: 'orbit', x: e.clientX, y: e.clientY, yaw: eng.cam.yaw, pitch: eng.cam.pitch };
+      try { glc.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
+      glc.style.cursor = drag.mode === 'move' ? 'ew-resize' : 'grabbing';
+    });
+    glc.addEventListener('pointermove', (e) => {
+      if (!drag) { glc.style.cursor = overMovable(e) ? 'ew-resize' : 'grab'; return; }
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (drag.mode === 'move') {
+        const l2 = drag.ax * drag.ax + drag.ay * drag.ay || 1;
+        let mm = (dx * drag.ax + dy * drag.ay) / l2;
+        if (md().kind === 'mic') mm *= 0.4;
+        if (e.shiftKey) mm *= 0.2;
+        setCount(drag.c0 + mm / sc().stepMm);
+      } else {
+        eng.cam.yaw = clamp(drag.yaw - dx * 0.008, -2.9, 2.9);
+        eng.cam.pitch = clamp(drag.pitch + dy * 0.008, -1.35, 1.35);
+        markViews(); draw();
+      }
+    });
+    const end = () => { drag = null; glc.style.cursor = 'grab'; };
+    glc.addEventListener('pointerup', end); glc.addEventListener('pointercancel', end);
+    glc.addEventListener('pointerleave', () => { if (!drag) armed = false; });
+    glc.addEventListener('wheel', (e) => {
+      if (!armed) return;
+      e.preventDefault();
+      S.camZoom = clamp(S.camZoom * Math.exp(-e.deltaY * 0.0015), 0.5, 9); draw();
+    }, { passive: false });
+    glc.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepBy((e.key === 'ArrowLeft' ? '-' : '+') + (e.shiftKey ? 'c' : 'f')); }
+    });
+    glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); $('.ms-nogl').hidden = false; });
+  }
+  function markViews() {
+    for (const b of $$('[data-view]')) {
+      const v = b.dataset.view;
+      b.classList.toggle('ms-on', (v === 'todo' && !S.zoomed) || (v === 'escala' && S.zoomed));
+    }
+  }
+  for (const b of $$('[data-view]')) b.addEventListener('click', () => {
+    const v = b.dataset.view;
+    if (v === 'todo') { S.zoomed = false; S.camZoom = 1; }
+    else if (v === 'escala') { S.zoomed = true; S.camZoom = 1; if (eng) { eng.cam.yaw = 0; eng.cam.pitch = 0; } }
+    else if (v === 'frente') { if (eng) { eng.cam.yaw = 0; eng.cam.pitch = 0; } }
+    else if (v === '3d') { if (eng) { eng.cam.yaw = -0.5; eng.cam.pitch = 0.32; } }
+    else if (v === 'mas') S.camZoom = clamp(S.camZoom * 1.3, 0.5, 9);
+    else if (v === 'menos') S.camZoom = clamp(S.camZoom / 1.3, 0.5, 9);
+    markViews(); draw();
+  });
+
+  /* ---------- Vista: lupa ---------- */
+  let ldrag = null;
+  lens.addEventListener('pointerdown', (e) => { ldrag = { x: e.clientX, pan: S.lensPan }; try { lens.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ } });
+  lens.addEventListener('pointermove', (e) => { if (ldrag && lensInfo) { S.lensPan = clamp(ldrag.pan - (e.clientX - ldrag.x) / lensInfo.k, -80, 80); draw(); } });
+  for (const ev of ['pointerup', 'pointercancel']) lens.addEventListener(ev, () => { ldrag = null; });
+  lens.addEventListener('dblclick', () => { S.lensPan = 0; S.lensZoom = 1; draw(); });
+  for (const b of $$('[data-lens]')) b.addEventListener('click', () => {
+    S.lensZoom = clamp(S.lensZoom * (b.dataset.lens === '+' ? 1.4 : 1 / 1.4), 0.7, 5); draw();
+  });
+  const guidesEl = $('.ms-guides');
+  guidesEl.addEventListener('change', () => {
+    S.guides = guidesEl.checked;
+    if (S.guides && S.act && !S.act.done) S.act.hint = true;
+    draw();
+  });
+
+  /* ---------- Vista: actividad ---------- */
+  const fb = $('.ms-fb'), input = $('.ms-answer');
+  function setFeedback(kind, title, msg) {
+    fb.hidden = !kind;
+    fb.className = 'ms-fb' + (kind ? ' ms-' + kind : '');
+    fb.replaceChildren();
+    if (!kind) return;
+    fb.appendChild(el('b', '', title));
+    if (msg) fb.appendChild(document.createTextNode(' ' + msg));
+  }
+  function record() {
+    const a = S.act;
+    if (!a || a.random || !a.id) return;
+    const r = S.results[a.id] || (S.results[a.id] = { attempts: 0, right: 0, wrong: 0, solved: false, first: false, seen: false });
+    return r;
+  }
+  function onCheck() {
+    const a = S.act;
+    if (!a || a.done) return;
+    if (a.kind === 'pieza' && S.count !== a.target) {
+      setFeedback('warn', 'Aún no hay contacto.', md().kind === 'mic'
+        ? 'Cierra el husillo sobre la pieza hasta que haga tope y después escribe la lectura.'
+        : (a.measure === 'exterior' ? 'Cierra las mordazas sobre la pieza hasta que hagan tope y después escribe la lectura.'
+          : a.measure === 'interior' ? 'Abre las puntas dentro del buje hasta que toquen las paredes y después escribe la lectura.'
+            : 'Extiende la varilla hasta que toque el fondo de la ranura y después escribe la lectura.'));
+      return;
+    }
+    const val = SIM.parseAnswer(input.value);
+    if (val === null) { setFeedback('warn', 'Escribe tu lectura.', sc().kind === 'frac' ? 'Usa una fracción, por ejemplo 1 5/16 o 45/128.' : 'Usa un número, por ejemplo ' + SIM.fmt(sc(), Math.round(sc().max / 7)).replace(/ .*/, '') + '.'); return; }
+    a.attempts++;
+    const r = record();
+    if (r) r.attempts++;
+    const res = SIM.check(md(), sc(), a.target, val);
+    if (res.ok) {
+      a.done = true; S.guides = true; S.show = true;
+      if (r) { r.right = (r.right || 0) + 1; if (!r.solved) r.first = r.attempts === 1 && !a.hint; r.solved = true; } else U.rand.ok++;
+      setFeedback('good', '¡Correcto!', 'La lectura es ' + SIM.fmt(sc(), a.target) + '. Abajo queda el desglose paso a paso.');
+    } else {
+      if (r) r.wrong = (r.wrong || 0) + 1; else U.rand.bad++;
+      setFeedback('bad', 'Todavía no.', res.msg + (a.attempts >= 2 ? ' Si lo necesitas, activa las guías de la lupa o consulta la solución.' : ''));
+    }
+    logEvent(res.ok ? 'correcta' : 'incorrecta', input.value, r ? r.attempts : a.attempts);
+    persist();
+    refresh();
+  }
+  function onSolution() {
+    const a = S.act;
+    if (!a || a.done) return;
+    a.done = true; a.revealed = true; S.guides = true; S.show = true;
+    if (a.kind === 'pieza') { S.count = a.target; }
+    const r = record();
+    if (r && !r.solved) r.seen = true;
+    logEvent('solución vista', '', r ? r.attempts : a.attempts);
+    persist();
+    setFeedback('warn', 'Solución:', 'la lectura es ' + SIM.fmt(sc(), a.target) + '. Revisa el desglose y compáralo con la lupa.');
+    refresh();
+  }
+  function onNext() {
+    const a = S.act;
+    if (!a) return;
+    if (a.random) { startRandom(a.kind); return; }
+    const nx = nextPending(a.id);
+    if (nx) start(nx);
+  }
+  $('.ms-checkbtn').addEventListener('click', onCheck);
+  $('.ms-solbtn').addEventListener('click', onSolution);
+  $('.ms-nextbtn').addEventListener('click', onNext);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onCheck(); } });
+  $('.ms-toggle').addEventListener('click', () => { S.show = !S.show; if (!S.show) S.guides = false; refresh(); });
+  $('.ms-startbtn').addEventListener('click', () => { if (!U.alumno) { needReg(); return; } const nx = nextPending(null); if (nx) start(nx); });
+  $('.ms-leavebtn').addEventListener('click', goFree);
+  $('.ms-rndread').addEventListener('click', () => startRandom('lectura'));
+  $('.ms-rndpiece').addEventListener('click', () => startRandom('pieza'));
+
+  /* ---------- Vista: lista ---------- */
+  const listEl = $('.ms-list');
+  function visibleRows() { return S.rows.filter((r) => S.filter === 'todos' || (r.model === S.model && r.unit === S.unit)); }
+  function nextPending(afterId) {
+    const list = visibleRows(), i = afterId ? list.findIndex((r) => r.id === afterId) : -1;
+    for (let k = 1; k <= list.length; k++) { const r = list[(i + k) % list.length]; if (!(S.results[r.id] && S.results[r.id].solved)) return r; }
+    return list.length ? list[(i + 1) % list.length] : null;
+  }
+  for (const b of $$('[data-filter]')) b.addEventListener('click', () => { S.filter = b.dataset.filter; renderList(); renderTiles(S.rows.length > 0); });
+  function renderList() {
+    for (const b of $$('[data-filter]')) b.setAttribute('aria-pressed', String(b.dataset.filter === S.filter));
+    listEl.replaceChildren();
+    listEl.classList.toggle('ms-locked', !U.alumno);
+    if (!visibleRows().length) listEl.appendChild(el('p', 'ms-note', 'No hay ejercicios para esta selección.'));
+    for (const r of visibleRows()) {
+      const res = S.results[r.id], b = el('button', 'ms-ex'); b.type = 'button';
+      if (res && res.solved) b.classList.add('ms-solved'); else if (res && (res.seen || res.attempts)) b.classList.add('ms-seen');
+      if (S.act && S.act.id === r.id) b.classList.add('ms-cur');
+      b.appendChild(el('span', 'ms-mark', res && res.solved ? '✓' : res && res.seen ? '!' : res && res.attempts ? '…' : ''));
+      const t = el('span', 'ms-et');
+      t.appendChild(el('span', 'ms-e1', r.id + ' · ' + TXT.tipo[r.kind]));
+      t.appendChild(el('span', 'ms-e2', (r.inst === 'vernier' ? 'Vernier ' : 'Micrómetro ') + r.res + (r.nivel ? ' · ' + r.nivel : '')));
+      b.appendChild(t);
+      b.addEventListener('click', () => start(r));
+      listEl.appendChild(b);
+    }
+  }
+  function renderTiles(ok) {
+    const ids = S.rows.map((r) => r.id), rs = ids.map((i) => S.results[i]).filter(Boolean), sum = (k) => rs.reduce((s, r) => s + (r[k] || 0), 0);
+    $('.ms-t1').textContent = ok ? rs.filter((r) => r.solved).length + ' / ' + ids.length : '—';
+    $('.ms-t2').textContent = ok ? String(rs.filter((r) => r.first).length) : '—';
+    $('.ms-t3').textContent = ok ? String(sum('right')) : '—';
+    $('.ms-t4').textContent = ok ? String(sum('wrong')) : '—';
+    $('.ms-count').textContent = !ok ? '—' : (S.filter === 'todos' ? 'Los ' + ids.length + ' ejercicios de todos los instrumentos. '
+      : visibleRows().length + ' ejercicios para ' + md().short + ', escala en ' + (S.unit === 'mm' ? 'milímetros' : 'pulgadas') + '. ')
+      + (U.alumno ? 'Elige uno: el instrumento mostrará una medida y tú escribes la lectura.' : 'Regístrate arriba para poder iniciarlos.');
+    $('.ms-randstats').textContent = U.alumno ? 'Práctica al azar: ' + U.rand.ok + ' correctas, ' + U.rand.bad + ' incorrectas.' : '';
+  }
+
+  /* ---------- Refresco general ---------- */
+  function refresh(full) {
+    const s = sc(), m = md(), a = S.act;
+    if (full) {
+      for (const b of $$('[data-model]')) b.setAttribute('aria-pressed', String(b.dataset.model === S.model));
+      renderUnits();
+      $('.ms-modelname').textContent = m.title;
+      $('.ms-lensnote').textContent = m.kind === 'vernier'
+        ? 'Paso 1: lee en la regla la última marca antes del 0 del vernier. Paso 2: busca la línea del vernier que coincide con una marca de la regla. Usa + para ampliar la lupa y arrástrala para recorrerla.'
+        : 'Paso 1: lee en el cilindro las marcas descubiertas por el tambor. Paso 2: lee la división del tambor que queda frente a la línea de referencia.';
+    }
+    /* controles de movimiento */
+    range.min = S.lo; range.max = Math.max(S.hi, S.lo + 1); range.value = S.count; range.disabled = S.locked;
+    for (const b of $$('[data-step]')) {
+      const c = b.dataset.step;
+      b.textContent = (c[0] === '-' ? '− ' : '+ ') + (c[1] === 'c' ? s.coarse : s.fine);
+      b.disabled = S.locked || (c[0] === '-' ? S.count <= S.lo : S.count >= S.hi);
+    }
+    $('.ms-movenote').textContent = S.locked ? 'El instrumento está fijo en la medida que debes leer.'
+      : m.kind === 'mic' ? 'Los botones mueven una vuelta completa del tambor (' + s.coarse + ') o una división (' + s.fine + ').'
+        : 'Los botones mueven una división de la regla (' + s.coarse + ') o un paso del vernier (' + s.fine + ').';
+    /* contacto */
+    const chip = $('.ms-chip'), touching = a && a.kind === 'pieza' && S.count === a.target;
+    chip.hidden = !(a && a.kind === 'pieza');
+    chip.textContent = touching ? 'En contacto con la pieza' : 'Sin contacto con la pieza';
+    chip.classList.toggle('ms-ok', !!touching);
+    /* tarjeta de actividad */
+    guidesEl.checked = S.guides;
+    $('.ms-acttitle').textContent = a ? (a.label + ' · ' + TXT.tipo[a.kind]) : 'Tu ejercicio';
+    $('.ms-actsub').textContent = a ? m.short + ' · escala en ' + (s.unit === 'mm' ? 'milímetros' : 'pulgadas') + ' (' + s.tag + ')' : '';
+    $('.ms-actsub').hidden = !a;
+    $('.ms-startbtn').hidden = !!a; $('.ms-leavebtn').hidden = !a;
+    $('.ms-startbtn').textContent = !U.alumno ? 'Registrarme para iniciar' : 'Iniciar ejercicio pendiente';
+    const stmt = $('.ms-stmt');
+    stmt.textContent = a ? a.text : !U.alumno ? 'Regístrate arriba con tu nombre, matrícula y grupo. Después elige un ejercicio de la lista: el instrumento mostrará una medida y aquí escribirás tu lectura.'
+      : 'Elige un ejercicio de la lista de abajo o pulsa el botón. El instrumento mostrará una medida y aquí escribirás tu lectura. Mientras tanto puedes mover el instrumento libremente.';
+    $('.ms-toggle').hidden = !!a || !CFG.MOSTRAR_LECTURA_AL_EXPLORAR;
+    $('.ms-toggle').textContent = S.show ? 'Ocultar lectura' : 'Mostrar lectura';
+    $('.ms-free').hidden = a ? !a.done : !CFG.MOSTRAR_LECTURA_AL_EXPLORAR;
+    $('.ms-read').textContent = S.show || (a && a.done) ? SIM.fmt(s, S.count) : '· · ·';
+    $('.ms-quiz').hidden = !a;
+    $('.ms-ansunit').textContent = s.unit;
+    $('.ms-anshint').textContent = s.kind === 'frac' ? 'Escribe la fracción simplificada o en 128avos, por ejemplo 1 5/16 o 45/128.'
+      : 'Escribe la lectura con ' + s.dec + ' decimales, por ejemplo ' + SIM.fmt(s, Math.round(s.max / 7)).replace(/ .*/, '') + '.';
+    $('.ms-checkbtn').disabled = !a || a.done; $('.ms-solbtn').disabled = !a || a.done; input.disabled = !a || a.done;
+    $('.ms-nextbtn').hidden = !(a && a.done);
+    const steps = $('.ms-steps');
+    steps.replaceChildren();
+    if ((!a && S.show) || (a && a.done)) {
+      for (const st of SIM.breakdown(m, s, a && a.done ? a.target : S.count)) {
+        const li = el('li'), t = el('span');
+        if (st.c) { const d = el('span', 'ms-dot'); d.style.background = st.c === 'a' ? SIM.GA : SIM.GB; t.appendChild(d); }
+        t.appendChild(document.createTextNode(st.t));
+        li.appendChild(t); li.appendChild(el('span', 'ms-sv', st.v));
+        steps.appendChild(li);
+      }
+    }
+    renderTiles(S.rows.length > 0);
+    if (full || (a && a.done)) renderList();
+    markViews();
+    draw();
+  }
+
+  /* ---------- Alumno, almacenamiento local y registro en línea ---------- */
+  const mem = {};
+  const store = {
+    get(k, d) { try { const v = window.localStorage.getItem('msim.' + k); if (v !== null) return JSON.parse(v); } catch (e) { /* sin almacenamiento */ } return k in mem ? mem[k] : d; },
+    set(k, v) { mem[k] = v; try { window.localStorage.setItem('msim.' + k, JSON.stringify(v)); } catch (e) { /* solo memoria */ } },
+    del(k) { delete mem[k]; try { window.localStorage.removeItem('msim.' + k); } catch (e) { /* solo memoria */ } }
+  };
+  const U = { alumno: null, queue: store.get('cola', []), log: [], rand: { ok: 0, bad: 0 }, net: '' };
+  if (!Array.isArray(U.queue)) U.queue = [];
+  const normMat = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  /* el avance local se guarda por alumno y por actividad: una actividad nueva empieza en ceros */
+  const keyOf = (al) => normMat(al.matricula) + '.' + hash(CFG.ACTIVIDAD).toString(36);
+  function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function prng(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  /* valor del ejercicio para este alumno: depende de su matrícula, del ejercicio y de la actividad */
+  function genTarget(ex, seedStr) {
+    const m = SIM.MODELS[ex.model], s = m.scales[ex.unit], R = prng(hash(seedStr));
+    const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
+    const lo = Math.ceil(ex.min * s.per), hi = Math.floor(ex.max * s.per), per = m.kind === 'mic' ? s.perRev : s.mainPer;
+    let c = ri(lo, hi);
+    if (ex.rule === 'cero') { const p = m.kind === 'mic' && s.unit === 'mm' ? 100 : per; c = Math.max(p, Math.round(c / p) * p); }
+    else if (ex.rule === 'medio') c = Math.floor(c / 100) * 100 + 50 + ri(5, 42);
+    else if (ex.rule === 'sinmedio') c = Math.floor(c / 100) * 100 + ri(6, 44);
+    else if (ex.rule === 'borde') c = Math.floor(c / per) * per + per - ri(1, 4);
+    else if (c % per === 0) c += ri(1, per - 1);
+    return clamp(c, 1, s.max);
+  }
+  function assignTargets() {
+    const mat = U.alumno ? normMat(U.alumno.matricula) : '';
+    for (const r of S.rows) r.target = U.alumno ? genTarget(r, mat + '|' + r.id + '|' + CFG.ACTIVIDAD) : null;
+  }
+  function loadBank(rows) {
+    const out = [];
+    for (const r of rows || []) {
+      const ms = mapScale(r.inst, r.res);
+      if (!ms || !r.id) continue;
+      out.push({ id: r.id, inst: r.inst, model: ms[0], unit: ms[1], kind: r.kind === 'pieza' ? 'pieza' : 'lectura', target: null, nivel: r.nivel || '',
+        shape: r.shape || '', measure: r.measure || 'exterior', min: +r.min, max: +r.max, rule: r.rule || 'libre', text: r.text || '', res: r.res, label: 'Ejercicio ' + r.id });
+    }
+    return out;
+  }
+  function uid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); }
+  function persist() {
+    if (!U.alumno) return;
+    const k = keyOf(U.alumno);
+    store.set('avance.' + k, S.results); store.set('azar.' + k, U.rand);
+  }
+  function logEvent(resultado, respuesta, intento) {
+    const a = S.act, s = sc(), al = U.alumno;
+    if (!a || !al) return;
+    const ev = {
+      id: uid(), fecha: new Date().toISOString(), actividad: CFG.ACTIVIDAD, grupo: al.grupo, matricula: al.matricula, nombre: al.nombre,
+      ejercicio: a.random ? 'AZAR' : a.id, origen: a.random ? 'azar' : 'propuesto', instrumento: md().kind === 'vernier' ? 'vernier' : 'micrómetro', escala: s.tag,
+      tipo: a.kind === 'pieza' ? 'pieza (' + a.measure + ')' : 'lectura', nivel: a.nivel || '', esperado: SIM.fmt(s, a.target),
+      respuesta: String(respuesta || '').trim().slice(0, 40), resultado, intento, pista: a.hint ? 'sí' : 'no'
+    };
+    U.log.push(ev); if (U.log.length > 3000) U.log.shift();
+    store.set('bitacora.' + keyOf(al), U.log);
+    U.queue.push(ev); if (U.queue.length > 800) U.queue.shift();
+    store.set('cola', U.queue);
+    flush();
+  }
+  let sending = false, retry = 0;
+  async function flush() {
+    paintSync();
+    if (sending || !CFG.REGISTRO_URL || !U.queue.length) return;
+    sending = true;
+    const batch = U.queue.slice(0, 20);
+    try {
+      const r = await fetch(CFG.REGISTRO_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ v: 1, eventos: batch }), keepalive: true });
+      const j = await r.json();
+      if (!j || !j.ok) throw new Error('rechazado');
+      const ids = {}; for (const e of batch) ids[e.id] = 1;
+      U.queue = U.queue.filter((e) => !ids[e.id]); store.set('cola', U.queue); U.net = 'ok';
+    } catch (e) { U.net = 'fail'; }
+    sending = false;
+    paintSync();
+    clearTimeout(retry);
+    if (U.queue.length) retry = setTimeout(flush, U.net === 'ok' ? 150 : 20000);
+  }
+  async function ping() {
+    if (!CFG.REGISTRO_URL) return;
+    try { const r = await fetch(CFG.REGISTRO_URL + (CFG.REGISTRO_URL.indexOf('?') < 0 ? '?' : '&') + 'ping=1'); const j = await r.json(); U.net = j && j.ok ? 'ok' : 'fail'; }
+    catch (e) { U.net = 'fail'; }
+    paintSync();
+    if (U.net === 'ok') flush();
+  }
+  window.addEventListener('online', () => { flush(); });
+  function paintSync() {
+    const e = $('.ms-sync'); let t, c;
+    if (!CFG.REGISTRO_URL) { t = 'Registro en línea no configurado'; c = 'ms-swarn'; }
+    else if (U.queue.length) { t = U.queue.length + (U.queue.length === 1 ? ' respuesta por enviar' : ' respuestas por enviar'); c = 'ms-swarn'; }
+    else if (U.net === 'fail') { t = 'Sin conexión con el registro'; c = 'ms-sbad'; }
+    else { t = 'Registro al día'; c = 'ms-sok'; }
+    e.textContent = t; e.className = 'ms-sync ' + c;
+  }
+  function downloadCsv() {
+    if (!U.alumno) return;
+    const cols = ['fecha', 'actividad', 'grupo', 'matricula', 'nombre', 'ejercicio', 'origen', 'instrumento', 'escala', 'tipo', 'nivel', 'esperado', 'respuesta', 'resultado', 'intento', 'pista'];
+    const q = (v) => { let x = String(v === undefined || v === null ? '' : v); if (/^[=+\-@]/.test(x)) x = "'" + x; return '"' + x.replace(/"/g, '""') + '"'; };
+    const csv = '﻿' + [cols.join(',')].concat(U.log.map((ev) => cols.map((c) => q(ev[c])).join(','))).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), a = document.createElement('a');
+    a.href = url; a.download = 'registro_' + normMat(U.alumno.matricula) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
+
+  /* formulario de registro */
+  const fNombre = $('.ms-fnombre'), fMat = $('.ms-fmat');
+  let fGrupo = $('.ms-fgrupo');
+  if (Array.isArray(CFG.GRUPOS) && CFG.GRUPOS.length) {
+    const sel = document.createElement('select'); sel.className = fGrupo.className; sel.setAttribute('aria-label', 'Grupo');
+    sel.appendChild(new Option('Elige tu grupo', ''));
+    for (const g of CFG.GRUPOS) sel.appendChild(new Option(String(g), String(g)));
+    fGrupo.replaceWith(sel); fGrupo = sel;
+  }
+  function regError(msg) { const e = $('.ms-regerr'); e.hidden = !msg; e.textContent = msg || ''; }
+  function needReg() {
+    regError('Regístrate para iniciar los ejercicios. La exploración libre no requiere registro.');
+    try { $('#alumno').scrollIntoView({ block: 'center', behavior: 'smooth' }); fNombre.focus({ preventScroll: true }); } catch (e) { /* sin desplazamiento */ }
+  }
+  function paintReg() {
+    const al = U.alumno;
+    $('.ms-regform').hidden = !!al; $('.ms-regdone').hidden = !al;
+    if (al) $('.ms-who').textContent = al.nombre + ' · ' + al.matricula + ' · Grupo ' + al.grupo;
+    $('.ms-changebtn').textContent = 'Cambiar alumno';
+    paintSync();
+  }
+  function setAlumno(al) {
+    U.alumno = al;
+    if (al) {
+      const k = keyOf(al);
+      store.set('alumno', al);
+      S.results = store.get('avance.' + k, {}) || {}; U.log = store.get('bitacora.' + k, []) || []; U.rand = store.get('azar.' + k, { ok: 0, bad: 0 }) || { ok: 0, bad: 0 };
+    } else { store.del('alumno'); S.results = {}; U.log = []; U.rand = { ok: 0, bad: 0 }; }
+    assignTargets(); regError(''); paintReg(); goFree();
+  }
+  function onRegister() {
+    const nombre = fNombre.value.replace(/\s+/g, ' ').trim().slice(0, 80), mat = fMat.value.replace(/\s+/g, '').toUpperCase().slice(0, 20);
+    const grupo = String(fGrupo.value || '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 20);
+    if (nombre.length < 5 || nombre.indexOf(' ') < 0) { regError('Escribe tu nombre completo (nombre y apellidos).'); fNombre.focus(); return; }
+    if (normMat(mat).length < 3) { regError('Escribe tu matrícula (al menos 3 letras o números).'); fMat.focus(); return; }
+    if (!grupo) { regError('Indica tu grupo.'); fGrupo.focus(); return; }
+    setAlumno({ nombre, matricula: mat, grupo });
+  }
+  $('.ms-regbtn').addEventListener('click', onRegister);
+  for (const f of [fNombre, fMat, fGrupo]) f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onRegister(); } });
+  let changeArmed = 0;
+  $('.ms-changebtn').addEventListener('click', () => {
+    const b = $('.ms-changebtn');
+    if (!changeArmed) { changeArmed = setTimeout(() => { changeArmed = 0; b.textContent = 'Cambiar alumno'; }, 4000); b.textContent = '¿Confirmar cambio de alumno?'; return; }
+    clearTimeout(changeArmed); changeArmed = 0;
+    fNombre.value = ''; fMat.value = ''; fGrupo.value = '';
+    setAlumno(null);
+  });
+  $('.ms-csvbtn').addEventListener('click', downloadCsv);
+
+  /* ---------- Tamaño y datos ---------- */
+  function layout() {
+    const w = root.clientWidth;
+    $('.ms-grid').classList.toggle('ms-wide', w >= 920);
+    const lw = lens.parentElement.clientWidth;
+    lens.style.height = clamp(Math.round(lw * 0.27), 132, 250) + 'px';
+    draw();
+  }
+  if (window.ResizeObserver) new ResizeObserver(layout).observe(root);
+  window.addEventListener('resize', layout);
+
+  S.rows = loadBank(window.MS_BANCO);
+  buildScene();
+  freeBounds();
+  if (eng) { eng.cam.yaw = -0.34; eng.cam.pitch = 0.22; }
+  layout();
+  refresh(true);
+
+  setAlumno((() => { const al = store.get('alumno', null); return al && al.nombre && al.matricula && al.grupo ? al : null; })());
+  ping();
+})();
+</script>
+</body>
+</html>
